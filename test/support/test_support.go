@@ -9,6 +9,7 @@ import (
 	olmV1 "github.com/operator-framework/api/pkg/operators/v1"
 	olmV1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/sirupsen/logrus"
+	tektonTriggers "github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"sigstore-e2e-test/pkg/client"
@@ -33,6 +34,7 @@ func init() {
 	olmV1.AddToScheme(TestClient.GetScheme())
 	projectv1.AddToScheme(TestClient.GetScheme())
 	routev1.AddToScheme(TestClient.GetScheme())
+	tektonTriggers.AddToScheme(TestClient.GetScheme())
 }
 
 func InstallPrerequisites(prerequisite ...support.TestPrerequisite) error {

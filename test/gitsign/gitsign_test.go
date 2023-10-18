@@ -9,7 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/onsi/gomega"
 	v1 "github.com/openshift/api/route/v1"
+	"github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
 	"io"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"net/http"
@@ -43,6 +45,8 @@ func TestSignVerifyCommit(t *testing.T) {
 		createResource(ns, path+"/verify-source-el.yaml")
 		createResource(ns, path+"/verify-source-el-route.yaml")
 		createResource(ns, path+"/webhook-secret-securesign-pipelines-demo.yaml")
+		createResource(ns, path+"/github-push-triggerbinding.yaml")
+		gomega.Expect(support.TestClient.Create(support.TestContext, createTriggerBindingResource(ns))).To(gomega.Succeed())
 
 		route := &v1.Route{}
 		gomega.Eventually(func() v1.Route {
@@ -116,6 +120,9 @@ func TestSignVerifyCommit(t *testing.T) {
 			err = cmd.Run()
 			gomega.Expect(err).To(gomega.BeNil())
 
+			// TODO: replace with tekton status check
+			time.Sleep(30 * time.Second)
+
 			gomega.Expect(repo.Push(&git.PushOptions{
 				Auth: &gitAuth.BasicAuth{
 					Username: "ignore",
@@ -135,6 +142,7 @@ func TestSignVerifyCommit(t *testing.T) {
 
 		t.Run("Verify pipeline run", func(t *testing.T) {
 			// verify tekton pipeline run
+			time.Sleep(5 * time.Minute)
 		})
 	})
 }
@@ -147,12 +155,53 @@ func createResource(ns string, filePath string) {
 	gomega.Expect(support.TestClient.Create(support.TestContext, object)).To(gomega.Succeed())
 }
 
+func createTriggerBindingResource(ns string) *v1beta1.TriggerBinding {
+	return &v1beta1.TriggerBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "sigstore-triggerbinding",
+			Namespace: ns,
+		},
+		Spec: v1beta1.TriggerBindingSpec{
+			Params: []v1beta1.Param{
+				{
+					Name:  "fulcio-url",
+					Value: os.Getenv("FULCIO_URL"),
+				},
+				{
+					Name:  "fulcio-crt-pem-url",
+					Value: os.Getenv("TUF_URL") + "/targets/fulcio_v1.crt.pem",
+				},
+				{
+					Name:  "rekor-url",
+					Value: os.Getenv("REKOR_URL"),
+				},
+				{
+					Name:  "issuer-url",
+					Value: os.Getenv("OIDC_ISSUER_URL"),
+				},
+				{
+					Name:  "tuff-mirror",
+					Value: os.Getenv("TUF_URL"),
+				},
+				{
+					Name:  "tuff-root",
+					Value: os.Getenv("TUF_URL") + "/root.json",
+				},
+				{
+					Name:  "rekor-public-key",
+					Value: os.Getenv("TUF_URL") + "/targets/rekor.pub",
+				},
+			},
+		},
+	}
+}
+
 func getOIDCToken() (string, error) {
 	urlString := os.Getenv("OIDC_ISSUER_URL") + "/protocol/openid-connect/token"
 
 	client := &http.Client{}
 	data := url.Values{}
-	data.Set("username", "jdoe")
+	data.Set("username", "jdoe@redhat.com")
 	data.Set("password", "secure")
 	data.Set("scope", "openid")
 	data.Set("client_id", "sigstore")
