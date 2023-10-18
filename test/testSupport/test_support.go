@@ -1,9 +1,10 @@
-package support
+package testSupport
 
 import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
+	configv1 "github.com/openshift/api/config/v1"
 	projectv1 "github.com/openshift/api/project/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	olmV1 "github.com/operator-framework/api/pkg/operators/v1"
@@ -35,6 +36,8 @@ func init() {
 	projectv1.AddToScheme(TestClient.GetScheme())
 	routev1.AddToScheme(TestClient.GetScheme())
 	tektonTriggers.AddToScheme(TestClient.GetScheme())
+	configv1.AddToScheme(TestClient.GetScheme())
+
 }
 
 func InstallPrerequisites(prerequisite ...support.TestPrerequisite) error {
@@ -43,13 +46,13 @@ func InstallPrerequisites(prerequisite ...support.TestPrerequisite) error {
 	wg.Add(len(prerequisite))
 	var errors []error
 	for _, i := range prerequisite {
-		go func() {
-			err := i.Install(TestClient)
+		go func(p support.TestPrerequisite) {
+			err := p.Install(TestClient)
 			if err != nil {
 				errors = append(errors, err)
 			}
 			wg.Done()
-		}()
+		}(i)
 	}
 	wg.Wait()
 	if len(errors) != 0 {

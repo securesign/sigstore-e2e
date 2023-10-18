@@ -2,18 +2,22 @@ package gitsign
 
 import (
 	"os"
-	"sigstore-e2e-test/pkg/tekton"
-	"sigstore-e2e-test/test/support"
+	"sigstore-e2e-test/pkg/tas"
+	"sigstore-e2e-test/test/testSupport"
 	"testing"
 )
 
 func TestMain(m *testing.M) {
-	if err := support.InstallPrerequisites(tekton.New(support.TestContext)); err != nil {
+	if err := testSupport.InstallPrerequisites(
+		//tekton.New(testSupport.TestContext),
+		//keycloak.New(testSupport.TestContext, true),
+		tas.New(testSupport.TestContext),
+	); err != nil {
 		panic(err)
 	}
 	defer func() {
 		// the defer does not work after panic coming from the test
-		if err := support.DestroyPrerequisities(); err != nil {
+		if err := testSupport.DestroyPrerequisities(); err != nil {
 			panic(err)
 		}
 	}()
