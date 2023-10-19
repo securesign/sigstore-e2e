@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	projectv1 "github.com/openshift/api/project/v1"
 	olmV1 "github.com/operator-framework/api/pkg/operators/v1"
 	olmV1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/sirupsen/logrus"
@@ -32,6 +33,7 @@ type Client interface {
 
 	CreateResource(ctx context.Context, ns string, filePath string) error
 	DeleteResource(ctx context.Context, ns string, filePath string) error
+	CreateProject(ctx context.Context, name string) error
 	InstallFromOperatorHub(context context.Context, name string, targetNamespace string, packageName string, channel string, source string, sourceNamespace string) error
 	DeleteUsingOperatorHub(ctx context.Context, name string, targetNamespace string) error
 }
@@ -101,6 +103,16 @@ func (c *defaultClient) DeleteResource(ctx context.Context, ns string, filePath 
 	}
 	object.SetNamespace(ns)
 	return c.Delete(ctx, object)
+}
+
+func (c *defaultClient) CreateProject(ctx context.Context, name string) error {
+	request := &projectv1.ProjectRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	logrus.Info("Creating new project ", name)
+	return c.Create(ctx, request)
 }
 
 func (c *defaultClient) InstallFromOperatorHub(ctx context.Context, name string, targetNamespace string, packageName string, channel string, source string, sourceNamespace string) error {

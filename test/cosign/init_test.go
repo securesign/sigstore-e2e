@@ -1,26 +1,21 @@
-package gitsign
+package cosign
 
 import (
 	"os"
 	"sigstore-e2e-test/pkg/tas"
-	"sigstore-e2e-test/pkg/tekton"
+	"sigstore-e2e-test/pkg/tas/cosign"
 	"sigstore-e2e-test/test/testSupport"
 	"testing"
 )
 
 func TestMain(m *testing.M) {
 	if err := testSupport.InstallPrerequisites(
-		tekton.New(testSupport.TestContext),
 		tas.NewTas(testSupport.TestContext),
+		cosign.NewCosign(testSupport.TestContext),
 	); err != nil {
 		panic(err)
 	}
-	defer func() {
-		// the defer does not work after panic coming from the test
-		if err := testSupport.DestroyPrerequisities(); err != nil {
-			panic(err)
-		}
-	}()
 	status := m.Run()
+	testSupport.DestroyPrerequisities()
 	os.Exit(status)
 }

@@ -186,6 +186,7 @@ func createTriggerBindingResource(ns string) *v1beta1.TriggerBinding {
 	}
 }
 
+// TODO: use function from test support
 func getOIDCToken() (string, error) {
 	urlString := os.Getenv("OIDC_ISSUER_URL") + "/protocol/openid-connect/token"
 

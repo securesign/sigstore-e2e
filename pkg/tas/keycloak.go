@@ -1,8 +1,7 @@
-package keycloak
+package tas
 
 import (
 	"context"
-	"github.com/go-git/go-git/v5"
 	projectv1 "github.com/openshift/api/project/v1"
 	v1 "github.com/openshift/api/route/v1"
 	"github.com/sirupsen/logrus"
@@ -16,35 +15,38 @@ import (
 )
 
 const (
-	SUBSCRIPTION_NAME    = "sigstore-keycloak"
-	PACKAGE_NAME         = "rhsso-operator"
-	CHANNEL              = "stable"
-	SOURCE               = "redhat-operators"
-	SOURCE_NAMESPACE     = "openshift-marketplace"
-	TARGET_NAMESPACE     = "keycloak-system"
-	RESOURCES_REPOSITORY = "https://github.com/securesign/sigstore-ocp.git"
-	OIDC_REALM           = "sigstore"
+	SUBSCRIPTION_NAME = "sigstore-keycloak"
+	PACKAGE_NAME      = "rhsso-operator"
+	CHANNEL           = "stable"
+	SOURCE            = "redhat-operators"
+	SOURCE_NAMESPACE  = "openshift-marketplace"
+	TARGET_NAMESPACE  = "keycloak-system"
+	OIDC_REALM        = "sigstore"
 )
 
 var (
-	preinstalled  bool
-	resourcesDir  string
-	OidcIssuerURL string
+	keycloakPreinstalled bool
+	resourcesDir         string
+	OidcIssuerURL        string
 )
 
-type TestPrerequisite struct {
+type keycloakInstaller struct {
 	ctx             context.Context
 	createResources bool
 }
 
-func New(ctx context.Context, createResources bool) *TestPrerequisite {
-	return &TestPrerequisite{
+func NewKeycloak(ctx context.Context, createResources bool) *keycloakInstaller {
+	return &keycloakInstaller{
 		ctx:             ctx,
 		createResources: createResources,
 	}
 }
 
-func (p TestPrerequisite) isRunning(c client.Client) (bool, error) {
+func (p keycloakInstaller) isRunning(c client.Client) (bool, error) {
+	OidcIssuerURL = os.Getenv("OIDC_ISSUER_URL")
+	if OidcIssuerURL != "" {
+		return true, nil
+	}
 	l, err := c.CoreV1().Pods(TARGET_NAMESPACE).List(p.ctx, metav1.ListOptions{
 		LabelSelector: "name=rhsso-operator",
 	},
@@ -52,45 +54,30 @@ func (p TestPrerequisite) isRunning(c client.Client) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	OidcIssuerURL = os.Getenv("OIDC_ISSUER_URL")
-	return len(l.Items) > 0 && OidcIssuerURL != "", nil
+	if len(l.Items) == 0 {
+		return false, err
+	}
+	err = p.resolveIssuerUrl(c)
+	return true, err
 }
 
-func (p TestPrerequisite) Install(c client.Client) error {
+func (p keycloakInstaller) Install(c client.Client) error {
 	var err error
-	preinstalled, err = p.isRunning(c)
+	keycloakPreinstalled, err = p.isRunning(c)
 	if err != nil {
 		return err
 	}
-	if preinstalled {
+	if keycloakPreinstalled {
 		logrus.Info("The RH-SSO-operator is already running")
 		return nil
 	}
 
-	request := &projectv1.ProjectRequest{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: TARGET_NAMESPACE,
-		},
-	}
-	logrus.Info("Creating new project ", TARGET_NAMESPACE)
-	c.Create(p.ctx, request)
+	c.CreateProject(p.ctx, TARGET_NAMESPACE)
 	if err := c.InstallFromOperatorHub(p.ctx, SUBSCRIPTION_NAME, TARGET_NAMESPACE, PACKAGE_NAME, CHANNEL, SOURCE, SOURCE_NAMESPACE); err != nil {
 		return err
 	}
 	if p.createResources {
-		dir, err := os.MkdirTemp("", "sigstore-ocp")
-		if err != nil {
-			return err
-		}
-		_, err = git.PlainClone(dir, false, &git.CloneOptions{
-			URL:      RESOURCES_REPOSITORY,
-			Progress: os.Stdout,
-		})
-		if err != nil {
-			return err
-		}
-
-		resourcesDir = dir + "/keycloak/resources/"
+		resourcesDir = repoDir + "/keycloak/resources/"
 		entr, err := os.ReadDir(resourcesDir)
 		if err != nil {
 			return err
@@ -121,13 +108,13 @@ func (p TestPrerequisite) Install(c client.Client) error {
 			}
 			return route.Status.Ingress[0].Host != "", nil
 		})
-		OidcIssuerURL = route.Status.Ingress[0].Host + "/auth/realms/" + OIDC_REALM
+		p.resolveIssuerUrl(c)
 	}
 	return nil
 }
 
-func (p TestPrerequisite) Destroy(c client.Client) error {
-	if preinstalled {
+func (p keycloakInstaller) Destroy(c client.Client) error {
+	if keycloakPreinstalled {
 		logrus.Info("Skipping preinstalled RH-SSO operator")
 		return nil
 	} else {
@@ -159,4 +146,16 @@ func (p TestPrerequisite) Destroy(c client.Client) error {
 		}
 		return err
 	}
+}
+
+func (p keycloakInstaller) resolveIssuerUrl(c client.Client) error {
+	routeKey := controller.ObjectKey{
+		Namespace: TARGET_NAMESPACE,
+		Name:      "keycloak",
+	}
+	route := &v1.Route{}
+	err := c.Get(p.ctx, routeKey, route)
+	OidcIssuerURL = "https://" + route.Status.Ingress[0].Host + "/auth/realms/" + OIDC_REALM
+	return err
+
 }
