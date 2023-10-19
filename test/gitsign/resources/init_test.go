@@ -17,7 +17,7 @@ func TestMain(m *testing.M) {
 	}
 	defer func() {
 		// the defer does not work after panic coming from the test
-		if err := testSupport.DestroyPrerequisities(); err != nil {
+		if err := testSupport.DestroyPrerequisites(); err != nil {
 			panic(err)
 		}
 	}()
