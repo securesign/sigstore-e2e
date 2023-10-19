@@ -32,7 +32,7 @@ func (p cosignInstaller) Install(c client.Client) error {
 		return nil
 	}
 
-	dir, err := tas.Clone(COSIGN_REPO)
+	dir, err := tas.GitClone(COSIGN_REPO)
 	if err != nil {
 		return err
 	}

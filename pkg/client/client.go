@@ -34,6 +34,7 @@ type Client interface {
 	CreateResource(ctx context.Context, ns string, filePath string) error
 	DeleteResource(ctx context.Context, ns string, filePath string) error
 	CreateProject(ctx context.Context, name string) error
+	DeleteProject(ctx context.Context, name string) error
 	InstallFromOperatorHub(context context.Context, name string, targetNamespace string, packageName string, channel string, source string, sourceNamespace string) error
 	DeleteUsingOperatorHub(ctx context.Context, name string, targetNamespace string) error
 }
@@ -111,8 +112,15 @@ func (c *defaultClient) CreateProject(ctx context.Context, name string) error {
 			Name: name,
 		},
 	}
-	logrus.Info("Creating new project ", name)
+	logrus.Debug("Creating new project ", name)
 	return c.Create(ctx, request)
+}
+func (c *defaultClient) DeleteProject(ctx context.Context, name string) error {
+	return c.Delete(ctx, &projectv1.Project{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	})
 }
 
 func (c *defaultClient) InstallFromOperatorHub(ctx context.Context, name string, targetNamespace string, packageName string, channel string, source string, sourceNamespace string) error {

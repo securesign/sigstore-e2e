@@ -67,15 +67,15 @@ func InstallPrerequisites(prerequisite ...support.TestPrerequisite) error {
 	return nil
 }
 
-func DestroyPrerequisities() error {
+func DestroyPrerequisites() error {
 	wg := new(sync.WaitGroup)
 	wg.Add(len(prerequistities))
 	var errors []error
 	for _, i := range prerequistities {
 		go func(prerequisite support.TestPrerequisite) {
-			err := i.Destroy(TestClient)
-			logrus.Info("Destroying ")
+			err := prerequisite.Destroy(TestClient)
 			if err != nil {
+				logrus.Warn(err)
 				errors = append(errors, err)
 			}
 			wg.Done()

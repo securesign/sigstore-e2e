@@ -13,14 +13,14 @@ var repoDir string
 
 func init() {
 	var err error
-	repoDir, err = Clone(RESOURCES_REPOSITORY)
+	repoDir, err = GitClone(RESOURCES_REPOSITORY)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func Clone(url string) (string, error) {
-	dir, err := os.MkdirTemp("", "sigstoreClone")
+func GitClone(url string) (string, error) {
+	dir, err := os.MkdirTemp("", "sigstore")
 	if err != nil {
 		return "", err
 	}

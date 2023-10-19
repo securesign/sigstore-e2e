@@ -2,7 +2,6 @@ package tas
 
 import (
 	"context"
-	projectv1 "github.com/openshift/api/project/v1"
 	v1 "github.com/openshift/api/route/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,7 +34,7 @@ type keycloakInstaller struct {
 	createResources bool
 }
 
-func NewKeycloak(ctx context.Context, createResources bool) *keycloakInstaller {
+func NewKeycloakInstaller(ctx context.Context, createResources bool) *keycloakInstaller {
 	return &keycloakInstaller{
 		ctx:             ctx,
 		createResources: createResources,
@@ -68,7 +67,7 @@ func (p keycloakInstaller) Install(c client.Client) error {
 		return err
 	}
 	if keycloakPreinstalled {
-		logrus.Info("The RH-SSO-operator is already running")
+		logrus.Debug("The RH-SSO-operator is already running")
 		return nil
 	}
 
@@ -96,9 +95,9 @@ func (p keycloakInstaller) Install(c client.Client) error {
 			Namespace: TARGET_NAMESPACE,
 			Name:      "keycloak",
 		}
+		// wait for keycloak route
 		route := &v1.Route{}
 		wait.PollUntilContextTimeout(p.ctx, 10*time.Second, 10*time.Minute, true, func(ctx context.Context) (done bool, err error) {
-
 			if err := c.Get(ctx, routeKey, route); err != nil {
 				if errors.IsNotFound(err) {
 					return false, nil
@@ -115,9 +114,10 @@ func (p keycloakInstaller) Install(c client.Client) error {
 
 func (p keycloakInstaller) Destroy(c client.Client) error {
 	if keycloakPreinstalled {
-		logrus.Info("Skipping preinstalled RH-SSO operator")
+		logrus.Debug("Skipping preinstalled RH-SSO operator")
 		return nil
 	} else {
+		logrus.Info("Destroying RH-SSO")
 		entr, err := os.ReadDir(resourcesDir)
 		if err != nil {
 			return err
@@ -132,18 +132,7 @@ func (p keycloakInstaller) Destroy(c client.Client) error {
 		}
 
 		err = c.DeleteUsingOperatorHub(p.ctx, SUBSCRIPTION_NAME, TARGET_NAMESPACE)
-		prj := &projectv1.Project{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: projectv1.GroupVersion.String(),
-				Kind:       "Project",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: TARGET_NAMESPACE,
-			},
-		}
-		if err := c.Delete(p.ctx, prj); err != nil {
-			logrus.Warning("Warning: cannot delete test project ", prj.Name)
-		}
+		c.DeleteProject(p.ctx, TARGET_NAMESPACE)
 		return err
 	}
 }

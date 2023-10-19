@@ -83,7 +83,8 @@ func (p tasTestPrerequisite) isRunning(c client.Client) (bool, error) {
 }
 
 func (p tasTestPrerequisite) Install(c client.Client) error {
-	keycloak = NewKeycloak(p.ctx, true)
+	// check keycloak installation
+	keycloak = NewKeycloakInstaller(p.ctx, true)
 	keycloak.Install(c)
 
 	var err error
@@ -92,7 +93,7 @@ func (p tasTestPrerequisite) Install(c client.Client) error {
 		return err
 	}
 	if preinstalled {
-		logrus.Info("Using keycloakPreinstalled TAS system")
+		logrus.Debug("Using preinstalled TAS system")
 		return nil
 	}
 
@@ -102,7 +103,10 @@ func (p tasTestPrerequisite) Install(c client.Client) error {
 	}
 
 	c.CreateProject(p.ctx, FULCIO_NAMESPACE)
-	public, private, root, err := initFulcioCertificates(subdomain, true)
+	c.CreateProject(p.ctx, REKOR_NAMESPACE)
+
+	// create secrets with keys/certs
+	public, private, root, err := initCertificates(subdomain, true)
 	if err != nil {
 		return err
 	}
@@ -118,10 +122,9 @@ func (p tasTestPrerequisite) Install(c client.Client) error {
 			"password": CERT_PASSWORD,
 		},
 	}
-
 	c.CoreV1().Secrets(FULCIO_NAMESPACE).Create(p.ctx, &fulcio, metav1.CreateOptions{})
-	c.CreateProject(p.ctx, REKOR_NAMESPACE)
-	_, private, _, err = initFulcioCertificates(subdomain, false)
+
+	_, private, _, err = initCertificates(subdomain, false)
 	rekor := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "rekor-private-key",
@@ -134,7 +137,6 @@ func (p tasTestPrerequisite) Install(c client.Client) error {
 	c.CoreV1().Secrets(REKOR_NAMESPACE).Create(p.ctx, &rekor, metav1.CreateOptions{})
 
 	byte, _ := os.ReadFile(repoDir + "/examples/values-sigstore-openshift.yaml")
-
 	values := strings.ReplaceAll(string(byte[:]), "$OPENSHIFT_APPS_SUBDOMAIN", subdomain)
 	chartSpec := &helmClient.ChartSpec{
 		ReleaseName:     RELEASE_NAME,
@@ -155,14 +157,19 @@ func (p tasTestPrerequisite) Install(c client.Client) error {
 
 func (p tasTestPrerequisite) Destroy(c client.Client) error {
 	if preinstalled {
-		logrus.Info("Skipping preinstalled TAS uninstallation.")
+		logrus.Debug("Skipping preinstalled TAS uninstallation.")
 		return nil
 	} else {
-		return p.helmCli.UninstallRelease(&helmClient.ChartSpec{
+		logrus.Debug("Destroying TAS")
+		err := p.helmCli.UninstallRelease(&helmClient.ChartSpec{
 			ReleaseName: RELEASE_NAME,
 			Namespace:   "sigstore",
 			Wait:        true,
+			Timeout:     5 * time.Minute,
 		})
+		c.DeleteProject(p.ctx, FULCIO_NAMESPACE)
+		c.DeleteProject(p.ctx, REKOR_NAMESPACE)
+		return err
 	}
 }
 
@@ -174,7 +181,7 @@ func (p tasTestPrerequisite) getClusterSubdomain(c client.Client) (string, error
 	return "apps." + object.Spec.BaseDomain, err
 }
 
-func initFulcioCertificates(domain string, passwordProtected bool) ([]byte, []byte, []byte, error) {
+func initCertificates(domain string, passwordProtected bool) ([]byte, []byte, []byte, error) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, nil, nil, err
