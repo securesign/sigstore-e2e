@@ -2,16 +2,21 @@ package client
 
 import (
 	"context"
+	projectv1 "github.com/openshift/api/project/v1"
 	olmV1 "github.com/operator-framework/api/pkg/operators/v1"
 	olmV1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"os"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	controller "sigs.k8s.io/controller-runtime/pkg/client"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,6 +31,9 @@ type Client interface {
 	GetScheme() *runtime.Scheme
 	GetConfig() *rest.Config
 
+	CreateResource(ctx context.Context, ns string, filePath string) error
+	DeleteResource(ctx context.Context, ns string, filePath string) error
+	CreateProject(ctx context.Context, name string) error
 	InstallFromOperatorHub(context context.Context, name string, targetNamespace string, packageName string, channel string, source string, sourceNamespace string) error
 	DeleteUsingOperatorHub(ctx context.Context, name string, targetNamespace string) error
 }
@@ -77,6 +85,36 @@ func NewClient() (Client, error) {
 	}, nil
 }
 
+func (c *defaultClient) CreateResource(ctx context.Context, ns string, filePath string) error {
+	byte, _ := os.ReadFile(filePath)
+	object := &unstructured.Unstructured{}
+	if err := yaml.Unmarshal(byte, object); err != nil {
+		return err
+	}
+	object.SetNamespace(ns)
+	return c.Create(ctx, object)
+}
+
+func (c *defaultClient) DeleteResource(ctx context.Context, ns string, filePath string) error {
+	byte, _ := os.ReadFile(filePath)
+	object := &unstructured.Unstructured{}
+	if err := yaml.Unmarshal(byte, object); err != nil {
+		return err
+	}
+	object.SetNamespace(ns)
+	return c.Delete(ctx, object)
+}
+
+func (c *defaultClient) CreateProject(ctx context.Context, name string) error {
+	request := &projectv1.ProjectRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	logrus.Info("Creating new project ", name)
+	return c.Create(ctx, request)
+}
+
 func (c *defaultClient) InstallFromOperatorHub(ctx context.Context, name string, targetNamespace string, packageName string, channel string, source string, sourceNamespace string) error {
 	if targetNamespace == "openshift-operators" {
 		logrus.Debug("installing as a cluster-wide operator")
@@ -124,7 +162,11 @@ func (c *defaultClient) InstallFromOperatorHub(ctx context.Context, name string,
 			Name:      name,
 		}
 		if err := c.Get(ctx, subscriptionKey, subscription); err != nil {
-			return false, nil
+			if errors.IsNotFound(err) {
+				return false, nil
+			} else {
+				return false, err
+			}
 		}
 		csvName := subscription.Status.InstalledCSV
 		if csvName == "" {

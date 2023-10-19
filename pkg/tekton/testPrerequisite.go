@@ -8,27 +8,28 @@ import (
 	"sigstore-e2e-test/pkg/client"
 )
 
-const SUBSCRIPTION_NAME = "sigstore-tekton"
-const PACKAGE_NAME = "openshift-pipelines-operator-rh"
-const CHANNEL = "latest"
-const SOURCE = "redhat-operators"
-const SOURCE_NAMESPACE = "openshift-marketplace"
-
-const TARGET_NAMESPACE = "openshift-operators"
+const (
+	SUBSCRIPTION_NAME = "sigstore-tekton"
+	PACKAGE_NAME      = "openshift-pipelines-operator-rh"
+	CHANNEL           = "latest"
+	SOURCE            = "redhat-operators"
+	SOURCE_NAMESPACE  = "openshift-marketplace"
+	TARGET_NAMESPACE  = "openshift-operators"
+)
 
 var preinstalled bool
 
-type TektonTestPrerequisite struct {
+type TestPrerequisite struct {
 	ctx context.Context
 }
 
-func New(ctx context.Context) *TektonTestPrerequisite {
-	return &TektonTestPrerequisite{
+func New(ctx context.Context) *TestPrerequisite {
+	return &TestPrerequisite{
 		ctx: ctx,
 	}
 }
 
-func (p TektonTestPrerequisite) isRunning(c client.Client) (bool, error) {
+func (p TestPrerequisite) isRunning(c client.Client) (bool, error) {
 	csvs := &v1alpha1.ClusterServiceVersionList{}
 	if err := c.List(p.ctx, csvs, ctrl.InNamespace(TARGET_NAMESPACE), ctrl.HasLabels{"operators.coreos.com/openshift-pipelines-operator-rh.openshift-operators"}); err != nil {
 		return false, err
@@ -41,7 +42,7 @@ func (p TektonTestPrerequisite) isRunning(c client.Client) (bool, error) {
 	return false, nil
 }
 
-func (p TektonTestPrerequisite) Install(c client.Client) error {
+func (p TestPrerequisite) Install(c client.Client) error {
 	var err error
 	preinstalled, err = p.isRunning(c)
 	if err != nil {
@@ -55,7 +56,7 @@ func (p TektonTestPrerequisite) Install(c client.Client) error {
 	return nil
 }
 
-func (p TektonTestPrerequisite) Destroy(c client.Client) error {
+func (p TestPrerequisite) Destroy(c client.Client) error {
 	if preinstalled {
 		logrus.Info("Skipping preinstalled openshift-pipelines-operator")
 		return nil

@@ -12,8 +12,6 @@ import (
 	"github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
 	"io"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"net/http"
 	"net/url"
 	"os"
@@ -21,7 +19,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigstore-e2e-test/test/support"
+	"sigstore-e2e-test/test/testSupport"
 	"strconv"
 	"strings"
 	"testing"
@@ -33,24 +31,24 @@ const GITHUB_OWNER = "bouskaJ"
 const GITHUB_REPO = "gitsign-demo-test"
 
 func TestSignVerifyCommit(t *testing.T) {
-	support.WithNewTestNamespace(func(ns string) {
+	testSupport.WithNewTestNamespace(func(ns string) {
 		gomega.RegisterTestingT(t)
 
 		// use file definition for large tekton resources
 		_, b, _, _ := runtime.Caller(0)
 		path := filepath.Dir(b) + "/resources"
-		createResource(ns, path+"/verify-commit-signature-task.yaml")
-		createResource(ns, path+"/verify-source-code-pipeline.yaml")
-		createResource(ns, path+"/verify-source-code-triggertemplate.yaml")
-		createResource(ns, path+"/verify-source-el.yaml")
-		createResource(ns, path+"/verify-source-el-route.yaml")
-		createResource(ns, path+"/webhook-secret-securesign-pipelines-demo.yaml")
-		createResource(ns, path+"/github-push-triggerbinding.yaml")
-		gomega.Expect(support.TestClient.Create(support.TestContext, createTriggerBindingResource(ns))).To(gomega.Succeed())
+		testSupport.TestClient.CreateResource(testSupport.TestContext, ns, path+"/verify-commit-signature-task.yaml")
+		testSupport.TestClient.CreateResource(testSupport.TestContext, ns, path+"/verify-source-code-pipeline.yaml")
+		testSupport.TestClient.CreateResource(testSupport.TestContext, ns, path+"/verify-source-code-triggertemplate.yaml")
+		testSupport.TestClient.CreateResource(testSupport.TestContext, ns, path+"/verify-source-el.yaml")
+		testSupport.TestClient.CreateResource(testSupport.TestContext, ns, path+"/verify-source-el-route.yaml")
+		testSupport.TestClient.CreateResource(testSupport.TestContext, ns, path+"/webhook-secret-securesign-pipelines-demo.yaml")
+		testSupport.TestClient.CreateResource(testSupport.TestContext, ns, path+"/github-push-triggerbinding.yaml")
+		gomega.Expect(testSupport.TestClient.Create(testSupport.TestContext, createTriggerBindingResource(ns))).To(gomega.Succeed())
 
 		route := &v1.Route{}
 		gomega.Eventually(func() v1.Route {
-			support.TestClient.Get(support.TestContext, client.ObjectKey{
+			testSupport.TestClient.Get(testSupport.TestContext, client.ObjectKey{
 				Namespace: ns,
 				Name:      "el-verify-source",
 			}, route)
@@ -66,14 +64,14 @@ func TestSignVerifyCommit(t *testing.T) {
 		hookConfig["secret"] = "secretToken"
 		hookName := "test" + uuid.New().String()
 		client := github.NewClient(nil).WithAuthToken(GITHUB_TOKEN)
-		hook, response, err := client.Repositories.CreateHook(support.TestContext, GITHUB_OWNER, GITHUB_REPO, &github.Hook{
+		hook, response, err := client.Repositories.CreateHook(testSupport.TestContext, GITHUB_OWNER, GITHUB_REPO, &github.Hook{
 			Name:   &hookName,
 			Config: hookConfig,
 			Events: []string{"push"},
 		})
 		gomega.Expect(err).To(gomega.BeNil())
 		gomega.Expect(response.Status).To(gomega.Equal("201 Created"))
-		defer client.Repositories.DeleteHook(support.TestContext, GITHUB_OWNER, GITHUB_REPO, *hook.ID)
+		defer client.Repositories.DeleteHook(testSupport.TestContext, GITHUB_OWNER, GITHUB_REPO, *hook.ID)
 
 		t.Run("Sign github commit", func(t *testing.T) {
 			dir, _ := os.MkdirTemp("", "sigstore")
@@ -110,7 +108,7 @@ func TestSignVerifyCommit(t *testing.T) {
 			gomega.Expect(err).To(gomega.BeNil())
 
 			// use native git & gitsign commands (go-git Commit does not execute commit)
-			cmd := exec.CommandContext(support.TestContext, "/bin/sh", "-c", "git commit -m \"CI commit "+time.Now().String()+"\"")
+			cmd := exec.CommandContext(testSupport.TestContext, "/bin/sh", "-c", "git commit -m \"CI commit "+time.Now().String()+"\"")
 			gitsignPath, err := exec.LookPath("gitsign")
 			gitPath, err := exec.LookPath("git")
 			cmd.Env = append(cmd.Env, "SIGSTORE_ID_TOKEN="+token, "PATH=$PATH:"+filepath.Dir(gitsignPath)+":"+filepath.Dir(gitPath))
@@ -145,14 +143,6 @@ func TestSignVerifyCommit(t *testing.T) {
 			time.Sleep(5 * time.Minute)
 		})
 	})
-}
-
-func createResource(ns string, filePath string) {
-	byte, _ := os.ReadFile(filePath)
-	object := &unstructured.Unstructured{}
-	gomega.Expect(yaml.Unmarshal(byte, object)).To(gomega.Succeed())
-	object.SetNamespace(ns)
-	gomega.Expect(support.TestClient.Create(support.TestContext, object)).To(gomega.Succeed())
 }
 
 func createTriggerBindingResource(ns string) *v1beta1.TriggerBinding {
@@ -196,6 +186,7 @@ func createTriggerBindingResource(ns string) *v1beta1.TriggerBinding {
 	}
 }
 
+// TODO: use function from test support
 func getOIDCToken() (string, error) {
 	urlString := os.Getenv("OIDC_ISSUER_URL") + "/protocol/openid-connect/token"
 
