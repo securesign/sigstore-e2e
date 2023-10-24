@@ -10,7 +10,7 @@ import (
 
 func TestMain(m *testing.M) {
 	if err := testSupport.InstallPrerequisites(
-		tekton.New(testSupport.TestContext),
+		tekton.NewTektonInstaller(testSupport.TestContext),
 		tas.NewTas(testSupport.TestContext),
 	); err != nil {
 		panic(err)

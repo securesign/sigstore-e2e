@@ -1,42 +1,35 @@
-package cosign
+package gitsign
 
 import (
 	"context"
 	"os/exec"
 	"sigstore-e2e-test/pkg/client"
-	"sigstore-e2e-test/pkg/support"
 )
 
-var cosign string
-
-const COSIGN_REPO = "https://github.com/sigstore/cosign"
+var gitsignPath string
 
 type cosignInstaller struct {
 	ctx context.Context
 }
 
-func NewCosign(ctx context.Context) *cosignInstaller {
+func NewGitsignInstaller(ctx context.Context) *cosignInstaller {
 	return &cosignInstaller{
 		ctx: ctx,
 	}
 }
 
 func (p cosignInstaller) Install(c client.Client) error {
-	path, err := exec.LookPath("cosign")
+	path, err := exec.LookPath("gitsign")
 	if err != nil {
 		return err
 	}
 	if path != "" {
 		// already installed
-		cosign = path
+		gitsignPath = path
 		return nil
 	}
 
-	dir, _, err := support.GitClone(COSIGN_REPO)
-	if err != nil {
-		return err
-	}
-	return exec.CommandContext(p.ctx, "go", "install", dir+"/cmd/cosign").Run()
+	return exec.CommandContext(p.ctx, "go", "install", "github.com/sigstore/gitsign@latest").Run()
 }
 
 func (p cosignInstaller) Destroy(c client.Client) error {
