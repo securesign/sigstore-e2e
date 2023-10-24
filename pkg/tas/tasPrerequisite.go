@@ -156,11 +156,12 @@ func (p tasTestPrerequisite) Install(c client.Client) error {
 }
 
 func (p tasTestPrerequisite) Destroy(c client.Client) error {
+	keycloak.Destroy(c)
 	if preinstalled {
 		logrus.Debug("Skipping preinstalled TAS uninstallation.")
 		return nil
 	} else {
-		logrus.Debug("Destroying TAS")
+		logrus.Info("Destroying TAS")
 		err := p.helmCli.UninstallRelease(&helmClient.ChartSpec{
 			ReleaseName: RELEASE_NAME,
 			Namespace:   "sigstore",

@@ -19,17 +19,17 @@ const (
 
 var preinstalled bool
 
-type TestPrerequisite struct {
+type tektonPrerequisite struct {
 	ctx context.Context
 }
 
-func New(ctx context.Context) *TestPrerequisite {
-	return &TestPrerequisite{
+func NewTektonInstaller(ctx context.Context) *tektonPrerequisite {
+	return &tektonPrerequisite{
 		ctx: ctx,
 	}
 }
 
-func (p TestPrerequisite) isRunning(c client.Client) (bool, error) {
+func (p tektonPrerequisite) isRunning(c client.Client) (bool, error) {
 	csvs := &v1alpha1.ClusterServiceVersionList{}
 	if err := c.List(p.ctx, csvs, ctrl.InNamespace(TARGET_NAMESPACE), ctrl.HasLabels{"operators.coreos.com/openshift-pipelines-operator-rh.openshift-operators"}); err != nil {
 		return false, err
@@ -42,7 +42,7 @@ func (p TestPrerequisite) isRunning(c client.Client) (bool, error) {
 	return false, nil
 }
 
-func (p TestPrerequisite) Install(c client.Client) error {
+func (p tektonPrerequisite) Install(c client.Client) error {
 	var err error
 	preinstalled, err = p.isRunning(c)
 	if err != nil {
@@ -56,7 +56,7 @@ func (p TestPrerequisite) Install(c client.Client) error {
 	return nil
 }
 
-func (p TestPrerequisite) Destroy(c client.Client) error {
+func (p tektonPrerequisite) Destroy(c client.Client) error {
 	if preinstalled {
 		logrus.Info("Skipping preinstalled openshift-pipelines-operator")
 		return nil

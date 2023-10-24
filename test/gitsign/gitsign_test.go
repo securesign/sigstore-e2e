@@ -1,27 +1,23 @@
 package gitsign
 
 import (
-	"encoding/json"
 	"fmt"
-	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5"
 	gitAuth "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/google/go-github/v56/github"
 	"github.com/google/uuid"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 	v1 "github.com/openshift/api/route/v1"
 	"github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
-	"io"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"net/http"
-	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigstore-e2e-test/pkg/support"
+	"sigstore-e2e-test/pkg/tas"
+	"sigstore-e2e-test/pkg/tas/gitsign"
 	"sigstore-e2e-test/test/testSupport"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 )
@@ -32,7 +28,7 @@ const GITHUB_REPO = "gitsign-demo-test"
 
 func TestSignVerifyCommit(t *testing.T) {
 	testSupport.WithNewTestNamespace(func(ns string) {
-		gomega.RegisterTestingT(t)
+		RegisterTestingT(t)
 
 		// use file definition for large tekton resources
 		_, b, _, _ := runtime.Caller(0)
@@ -44,17 +40,17 @@ func TestSignVerifyCommit(t *testing.T) {
 		testSupport.TestClient.CreateResource(testSupport.TestContext, ns, path+"/verify-source-el-route.yaml")
 		testSupport.TestClient.CreateResource(testSupport.TestContext, ns, path+"/webhook-secret-securesign-pipelines-demo.yaml")
 		testSupport.TestClient.CreateResource(testSupport.TestContext, ns, path+"/github-push-triggerbinding.yaml")
-		gomega.Expect(testSupport.TestClient.Create(testSupport.TestContext, createTriggerBindingResource(ns))).To(gomega.Succeed())
+		Expect(testSupport.TestClient.Create(testSupport.TestContext, createTriggerBindingResource(ns))).To(Succeed())
 
 		route := &v1.Route{}
-		gomega.Eventually(func() v1.Route {
+		Eventually(func() v1.Route {
 			testSupport.TestClient.Get(testSupport.TestContext, client.ObjectKey{
 				Namespace: ns,
 				Name:      "el-verify-source",
 			}, route)
 			return *route
-		}, time.Minute).Should(gomega.Not(gomega.BeNil()))
-		gomega.Eventually(route.Status.Ingress[0].Host).Should(gomega.Not(gomega.BeNil()))
+		}, time.Minute).Should(Not(BeNil()))
+		Eventually(route.Status.Ingress[0].Host).Should(Not(BeNil()))
 
 		// register webhook
 		// TODO: migrate somewhere else
@@ -69,20 +65,16 @@ func TestSignVerifyCommit(t *testing.T) {
 			Config: hookConfig,
 			Events: []string{"push"},
 		})
-		gomega.Expect(err).To(gomega.BeNil())
-		gomega.Expect(response.Status).To(gomega.Equal("201 Created"))
+		Expect(err).To(BeNil())
+		Expect(response.Status).To(Equal("201 Created"))
 		defer client.Repositories.DeleteHook(testSupport.TestContext, GITHUB_OWNER, GITHUB_REPO, *hook.ID)
 
 		t.Run("Sign github commit", func(t *testing.T) {
-			dir, _ := os.MkdirTemp("", "sigstore")
-			repo, err := git.PlainClone(dir, false, &git.CloneOptions{
-				URL:      fmt.Sprintf("https://github.com/%s/%s.git", GITHUB_OWNER, GITHUB_REPO),
-				Progress: os.Stdout,
-			})
-			gomega.Expect(err).To(gomega.BeNil())
+			dir, repo, err := support.GitClone(fmt.Sprintf("https://github.com/%s/%s.git", GITHUB_OWNER, GITHUB_REPO))
+			Expect(err).To(BeNil())
 
 			config, err := repo.Config()
-			gomega.Expect(err).To(gomega.BeNil())
+			Expect(err).To(BeNil())
 
 			config.User.Name = "John Doe"
 			config.User.Email = "jdoe@redhat.com"
@@ -91,51 +83,41 @@ func TestSignVerifyCommit(t *testing.T) {
 			config.Raw.AddOption("gpg", "x509", "program", "gitsign")
 			config.Raw.AddOption("gpg", "", "format", "x509")
 
-			config.Raw.AddOption("gitsign", "", "fulcio", os.Getenv("FULCIO_URL"))
-			config.Raw.AddOption("gitsign", "", "rekor", os.Getenv("REKOR_URL"))
-			config.Raw.AddOption("gitsign", "", "issuer", os.Getenv("OIDC_ISSUER_URL"))
+			config.Raw.AddOption("gitsign", "", "fulcio", tas.FulcioURL)
+			config.Raw.AddOption("gitsign", "", "rekor", tas.RekorURL)
+			config.Raw.AddOption("gitsign", "", "issuer", tas.OidcIssuerURL)
 
 			repo.SetConfig(config)
 
 			d1 := []byte(uuid.New().String())
 			testFileName := dir + "/testFile.txt"
-			gomega.Expect(os.WriteFile(testFileName, d1, 0644)).To(gomega.Succeed())
+			Expect(os.WriteFile(testFileName, d1, 0644)).To(Succeed())
 			worktree, err := repo.Worktree()
-			gomega.Expect(err).To(gomega.BeNil())
+			Expect(err).To(BeNil())
 			worktree.Add(".")
 
-			token, err := getOIDCToken()
-			gomega.Expect(err).To(gomega.BeNil())
-
-			// use native git & gitsign commands (go-git Commit does not execute commit)
-			cmd := exec.CommandContext(testSupport.TestContext, "/bin/sh", "-c", "git commit -m \"CI commit "+time.Now().String()+"\"")
-			gitsignPath, err := exec.LookPath("gitsign")
-			gitPath, err := exec.LookPath("git")
-			cmd.Env = append(cmd.Env, "SIGSTORE_ID_TOKEN="+token, "PATH=$PATH:"+filepath.Dir(gitsignPath)+":"+filepath.Dir(gitPath))
-			cmd.Dir = dir
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stdout
-			err = cmd.Run()
-			gomega.Expect(err).To(gomega.BeNil())
+			token, err := testSupport.GetOIDCToken(tas.OidcIssuerURL, "jdoe@redhat.com", "secure", tas.OIDC_REALM)
+			Expect(err).To(BeNil())
+			Expect(gitsign.GitWithGitSign(testSupport.TestContext, dir, token, "commit", "-m", "\"CI commit "+time.Now().String()+"\"")).To(Succeed())
 
 			// TODO: replace with tekton status check
 			time.Sleep(30 * time.Second)
 
-			gomega.Expect(repo.Push(&git.PushOptions{
+			Expect(repo.Push(&git.PushOptions{
 				Auth: &gitAuth.BasicAuth{
 					Username: "ignore",
 					Password: GITHUB_TOKEN,
-				}})).To(gomega.Succeed())
+				}})).To(Succeed())
 
 			ref, err := repo.Head()
-			gomega.Expect(err).To(gomega.BeNil())
+			Expect(err).To(BeNil())
 			logEntry, err := repo.Log(&git.LogOptions{
 				From: ref.Hash(),
 			})
-			gomega.Expect(err).To(gomega.BeNil())
+			Expect(err).To(BeNil())
 			commit, err := logEntry.Next()
-			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(commit.PGPSignature).To(gomega.Not(gomega.BeNil()))
+			Expect(err).To(BeNil())
+			Expect(commit.PGPSignature).To(Not(BeNil()))
 		})
 
 		t.Run("Verify pipeline run", func(t *testing.T) {
@@ -155,67 +137,33 @@ func createTriggerBindingResource(ns string) *v1beta1.TriggerBinding {
 			Params: []v1beta1.Param{
 				{
 					Name:  "fulcio-url",
-					Value: os.Getenv("FULCIO_URL"),
+					Value: tas.FulcioURL,
 				},
 				{
 					Name:  "fulcio-crt-pem-url",
-					Value: os.Getenv("TUF_URL") + "/targets/fulcio_v1.crt.pem",
+					Value: tas.TufURL + "/targets/fulcio_v1.crt.pem",
 				},
 				{
 					Name:  "rekor-url",
-					Value: os.Getenv("REKOR_URL"),
+					Value: tas.RekorURL,
 				},
 				{
 					Name:  "issuer-url",
-					Value: os.Getenv("OIDC_ISSUER_URL"),
+					Value: tas.OidcIssuerURL,
 				},
 				{
 					Name:  "tuff-mirror",
-					Value: os.Getenv("TUF_URL"),
+					Value: tas.TufURL,
 				},
 				{
 					Name:  "tuff-root",
-					Value: os.Getenv("TUF_URL") + "/root.json",
+					Value: tas.TufURL + "/root.json",
 				},
 				{
 					Name:  "rekor-public-key",
-					Value: os.Getenv("TUF_URL") + "/targets/rekor.pub",
+					Value: tas.TufURL + "/targets/rekor.pub",
 				},
 			},
 		},
 	}
-}
-
-// TODO: use function from test support
-func getOIDCToken() (string, error) {
-	urlString := os.Getenv("OIDC_ISSUER_URL") + "/protocol/openid-connect/token"
-
-	client := &http.Client{}
-	data := url.Values{}
-	data.Set("username", "jdoe@redhat.com")
-	data.Set("password", "secure")
-	data.Set("scope", "openid")
-	data.Set("client_id", "sigstore")
-	data.Set("grant_type", "password")
-
-	r, _ := http.NewRequest(http.MethodPost, urlString, strings.NewReader(data.Encode())) // URL-encoded payload
-	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	r.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
-
-	resp, err := client.Do(r)
-	if err != nil {
-		return "", err
-	}
-	b, err := io.ReadAll(resp.Body)
-
-	defer resp.Body.Close()
-	if err != nil {
-		return "", err
-	}
-	jsonOut := make(map[string]interface{})
-	err = json.Unmarshal(b, &jsonOut)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%v", jsonOut["access_token"]), nil
 }
