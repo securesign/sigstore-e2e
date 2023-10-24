@@ -1,20 +1,21 @@
 package cosign
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"os"
 	"sigstore-e2e-test/pkg/tas"
 	"sigstore-e2e-test/pkg/tas/cosign"
 	"sigstore-e2e-test/test/testSupport"
+	"testing"
 )
 
-var _ = BeforeSuite(func() {
-	Expect(testSupport.InstallPrerequisites(
+func TestMain(m *testing.M) {
+	if err := testSupport.InstallPrerequisites(
 		tas.NewTas(testSupport.TestContext),
 		cosign.NewCosign(testSupport.TestContext),
-	)).To(Succeed())
-})
-
-var _ = AfterSuite(func() {
+	); err != nil {
+		panic(err)
+	}
+	status := m.Run()
 	testSupport.DestroyPrerequisites()
-})
+	os.Exit(status)
+}
