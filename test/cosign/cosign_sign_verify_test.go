@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const testImage string = "alpine:latest"
+
 var cli *client.Client
 
 func TestCosignSignVerify(t *testing.T) {
@@ -20,7 +22,11 @@ func TestCosignSignVerify(t *testing.T) {
 	cli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	Expect(err).To(BeNil())
 	targetImageName := "ttl.sh/" + uuid.New().String() + ":5m"
-	Expect(cli.ImageTag(testSupport.TestContext, "alpine:latest", targetImageName)).To(Succeed())
+
+	_, err = cli.ImagePull(testSupport.TestContext, testImage, types.ImagePullOptions{})
+	Expect(err).To(BeNil())
+
+	Expect(cli.ImageTag(testSupport.TestContext, testImage, targetImageName)).To(Succeed())
 	_, err = cli.ImagePush(testSupport.TestContext, targetImageName, types.ImagePushOptions{RegistryAuth: types.RegistryAuthFromSpec})
 	Expect(err).To(BeNil())
 	// wait for a while to be sure that the image is pushed
