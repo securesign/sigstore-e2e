@@ -93,10 +93,11 @@ func (p tasTestPrerequisite) Install(c client.Client) error {
 		return err
 	}
 	if preinstalled {
-		logrus.Debug("Using preinstalled TAS system")
+		logrus.Info("TAS system is already installed - skipping installation.")
 		return nil
 	}
 
+	logrus.Info("Installing TAS system.")
 	subdomain, err := p.getClusterSubdomain(c)
 	if err != nil {
 		return err

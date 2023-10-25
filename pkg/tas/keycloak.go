@@ -67,10 +67,11 @@ func (p keycloakInstaller) Install(c client.Client) error {
 		return err
 	}
 	if keycloakPreinstalled {
-		logrus.Debug("The RH-SSO-operator is already running")
+		logrus.Info("The RH-SSO-operator is already running - skipping installation.")
 		return nil
 	}
 
+	logrus.Info("Installing RH-SSO system.")
 	c.CreateProject(p.ctx, TARGET_NAMESPACE)
 	if err := c.InstallFromOperatorHub(p.ctx, SUBSCRIPTION_NAME, TARGET_NAMESPACE, PACKAGE_NAME, CHANNEL, SOURCE, SOURCE_NAMESPACE); err != nil {
 		return err

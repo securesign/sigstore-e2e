@@ -49,9 +49,10 @@ func (p tektonPrerequisite) Install(c client.Client) error {
 		return err
 	}
 	if preinstalled {
-		logrus.Info("The openshift-pipelines-operator is already running")
+		logrus.Info("The openshift-pipelines-operator is already running - skipping installation.")
 		return nil
 	}
+	logrus.Info("Installing openshift-pipelines-operator.")
 	c.InstallFromOperatorHub(p.ctx, SUBSCRIPTION_NAME, TARGET_NAMESPACE, PACKAGE_NAME, CHANNEL, SOURCE, SOURCE_NAMESPACE)
 	return nil
 }
