@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	configv1 "github.com/openshift/api/config/v1"
 	projectv1 "github.com/openshift/api/project/v1"
 	routev1 "github.com/openshift/api/route/v1"
@@ -13,19 +12,21 @@ import (
 	"github.com/sirupsen/logrus"
 	tektonTriggers "github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
 	"io"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"net/url"
-	"os"
 	"sigstore-e2e-test/pkg/client"
 	"sigstore-e2e-test/pkg/support"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
-var TestClient client.Client
-var TestContext context.Context
+var (
+	TestClient        client.Client
+	TestContext       context.Context
+	TestTimeoutMedium = 5 * time.Minute
+)
 
 var prerequistities []support.TestPrerequisite
 
@@ -86,34 +87,6 @@ func DestroyPrerequisites() error {
 		return fmt.Errorf("can't destroy all prerequisities %s", errors)
 	}
 	return nil
-}
-
-func WithNewTestNamespace(doRun func(string)) {
-	keepNs := true
-	name := os.Getenv("TEST_NS")
-	if name == "" {
-		keepNs = false
-		name = "test-" + uuid.New().String()
-	}
-
-	request := &projectv1.ProjectRequest{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-	}
-	logrus.Info("Creating new project ", name)
-	TestClient.Create(TestContext, request)
-	defer func() {
-		if !keepNs {
-			TestClient.Delete(TestContext, &projectv1.Project{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: name,
-				},
-			})
-		}
-	}()
-
-	doRun(name)
 }
 
 func GetOIDCToken(issuerUrl string, userName string, password string, realm string) (string, error) {

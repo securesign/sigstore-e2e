@@ -68,18 +68,10 @@ func (p tasTestPrerequisite) isRunning(c client.Client) (bool, error) {
 	if FulcioURL != "" && RekorURL != "" && TufURL != "" {
 		return true, nil
 	}
-
-	releases, err := p.helmCli.ListDeployedReleases()
-	if err != nil {
-		return false, err
+	if err := p.resolveRoutes(c); err != nil {
+		return false, nil
 	}
-	for _, r := range releases {
-		if r.Name == RELEASE_NAME {
-			p.resolveRoutes(c)
-			return true, nil
-		}
-	}
-	return false, nil
+	return true, nil
 }
 
 func (p tasTestPrerequisite) Install(c client.Client) error {

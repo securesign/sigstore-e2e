@@ -62,6 +62,7 @@ func (p tektonPrerequisite) Destroy(c client.Client) error {
 		logrus.Info("Skipping preinstalled openshift-pipelines-operator")
 		return nil
 	} else {
+		logrus.Info("Destroying openshift-pipelines-operator")
 		return c.DeleteUsingOperatorHub(p.ctx, SUBSCRIPTION_NAME, TARGET_NAMESPACE)
 	}
 }
