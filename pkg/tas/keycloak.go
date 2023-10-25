@@ -80,7 +80,7 @@ func (p KeycloakInstaller) Install(c client.Client) error {
 		return err
 	}
 	if p.createResources {
-		resourcesDir = repoDir + "/keycloak/resources/base"
+		resourcesDir = repoDir + "/keycloak/resources/base/"
 		entr, err := os.ReadDir(resourcesDir)
 		if err != nil {
 			return err

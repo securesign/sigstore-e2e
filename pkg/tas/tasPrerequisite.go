@@ -83,11 +83,14 @@ func (p tasTestPrerequisite) isRunning(c client.Client) (bool, error) {
 }
 
 func (p tasTestPrerequisite) Install(c client.Client) error {
+	var err error
 	// check keycloak installation
 	keycloak = NewKeycloakInstaller(p.ctx, true)
-	keycloak.Install(c)
+	err = keycloak.Install(c)
+	if err != nil {
+		return err
+	}
 
-	var err error
 	preinstalled, err = p.isRunning(c)
 	if err != nil {
 		return err
