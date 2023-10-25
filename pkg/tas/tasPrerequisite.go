@@ -35,7 +35,7 @@ const (
 
 var (
 	preinstalled bool
-	keycloak     *keycloakInstaller
+	keycloak     *KeycloakInstaller
 	FulcioURL    string
 	RekorURL     string
 	TufURL       string
@@ -137,8 +137,8 @@ func (p tasTestPrerequisite) Install(c client.Client) error {
 	}
 	c.CoreV1().Secrets(REKOR_NAMESPACE).Create(p.ctx, &rekor, metav1.CreateOptions{})
 
-	byte, _ := os.ReadFile(repoDir + "/examples/values-sigstore-openshift.yaml")
-	values := strings.ReplaceAll(string(byte[:]), "$OPENSHIFT_APPS_SUBDOMAIN", subdomain)
+	bytes, _ := os.ReadFile(repoDir + "/examples/values-sigstore-openshift.yaml")
+	values := strings.ReplaceAll(string(bytes[:]), "$OPENSHIFT_APPS_SUBDOMAIN", subdomain)
 	chartSpec := &helmClient.ChartSpec{
 		ReleaseName:     RELEASE_NAME,
 		ChartName:       repoDir + "/charts/trusted-artifact-signer",
@@ -146,7 +146,7 @@ func (p tasTestPrerequisite) Install(c client.Client) error {
 		Wait:            true,
 		ValuesYaml:      values,
 		CreateNamespace: true,
-		Timeout:         5 * time.Minute,
+		Timeout:         8 * time.Minute,
 	}
 	_, err = p.helmCli.InstallOrUpgradeChart(p.ctx, chartSpec, &helmClient.GenericHelmOptions{})
 	if err != nil {

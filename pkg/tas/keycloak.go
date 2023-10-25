@@ -29,19 +29,19 @@ var (
 	OidcIssuerURL        string
 )
 
-type keycloakInstaller struct {
+type KeycloakInstaller struct {
 	ctx             context.Context
 	createResources bool
 }
 
-func NewKeycloakInstaller(ctx context.Context, createResources bool) *keycloakInstaller {
-	return &keycloakInstaller{
+func NewKeycloakInstaller(ctx context.Context, createResources bool) *KeycloakInstaller {
+	return &KeycloakInstaller{
 		ctx:             ctx,
 		createResources: createResources,
 	}
 }
 
-func (p keycloakInstaller) isRunning(c client.Client) (bool, error) {
+func (p KeycloakInstaller) isRunning(c client.Client) (bool, error) {
 	OidcIssuerURL = os.Getenv("OIDC_ISSUER_URL")
 	if OidcIssuerURL != "" {
 		return true, nil
@@ -60,7 +60,7 @@ func (p keycloakInstaller) isRunning(c client.Client) (bool, error) {
 	return true, err
 }
 
-func (p keycloakInstaller) Install(c client.Client) error {
+func (p KeycloakInstaller) Install(c client.Client) error {
 	var err error
 	keycloakPreinstalled, err = p.isRunning(c)
 	if err != nil {
@@ -72,7 +72,10 @@ func (p keycloakInstaller) Install(c client.Client) error {
 	}
 
 	logrus.Info("Installing RH-SSO system.")
-	c.CreateProject(p.ctx, TARGET_NAMESPACE)
+	err = c.CreateProject(p.ctx, TARGET_NAMESPACE)
+	if err != nil {
+		return err
+	}
 	if err := c.InstallFromOperatorHub(p.ctx, SUBSCRIPTION_NAME, TARGET_NAMESPACE, PACKAGE_NAME, CHANNEL, SOURCE, SOURCE_NAMESPACE); err != nil {
 		return err
 	}
@@ -98,7 +101,7 @@ func (p keycloakInstaller) Install(c client.Client) error {
 		}
 		// wait for keycloak route
 		route := &v1.Route{}
-		wait.PollUntilContextTimeout(p.ctx, 10*time.Second, 10*time.Minute, true, func(ctx context.Context) (done bool, err error) {
+		err = wait.PollUntilContextTimeout(p.ctx, 10*time.Second, 10*time.Minute, true, func(ctx context.Context) (done bool, err error) {
 			if err := c.Get(ctx, routeKey, route); err != nil {
 				if errors.IsNotFound(err) {
 					return false, nil
@@ -108,12 +111,18 @@ func (p keycloakInstaller) Install(c client.Client) error {
 			}
 			return route.Status.Ingress[0].Host != "", nil
 		})
-		p.resolveIssuerUrl(c)
+		if err != nil {
+			return err
+		}
+		err = p.resolveIssuerUrl(c)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (p keycloakInstaller) Destroy(c client.Client) error {
+func (p KeycloakInstaller) Destroy(c client.Client) error {
 	if keycloakPreinstalled {
 		logrus.Debug("Skipping preinstalled RH-SSO operator")
 		return nil
@@ -133,12 +142,12 @@ func (p keycloakInstaller) Destroy(c client.Client) error {
 		}
 
 		err = c.DeleteUsingOperatorHub(p.ctx, SUBSCRIPTION_NAME, TARGET_NAMESPACE)
-		c.DeleteProject(p.ctx, TARGET_NAMESPACE)
+		_ = c.DeleteProject(p.ctx, TARGET_NAMESPACE)
 		return err
 	}
 }
 
-func (p keycloakInstaller) resolveIssuerUrl(c client.Client) error {
+func (p KeycloakInstaller) resolveIssuerUrl(c client.Client) error {
 	routeKey := controller.ObjectKey{
 		Namespace: TARGET_NAMESPACE,
 		Name:      "keycloak",
