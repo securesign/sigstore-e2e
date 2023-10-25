@@ -87,9 +87,9 @@ func NewClient() (Client, error) {
 }
 
 func (c *defaultClient) CreateResource(ctx context.Context, ns string, filePath string) error {
-	byte, _ := os.ReadFile(filePath)
+	bytes, _ := os.ReadFile(filePath)
 	object := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal(byte, object); err != nil {
+	if err := yaml.Unmarshal(bytes, object); err != nil {
 		return err
 	}
 	object.SetNamespace(ns)
@@ -97,9 +97,9 @@ func (c *defaultClient) CreateResource(ctx context.Context, ns string, filePath 
 }
 
 func (c *defaultClient) DeleteResource(ctx context.Context, ns string, filePath string) error {
-	byte, _ := os.ReadFile(filePath)
+	bytes, _ := os.ReadFile(filePath)
 	object := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal(byte, object); err != nil {
+	if err := yaml.Unmarshal(bytes, object); err != nil {
 		return err
 	}
 	object.SetNamespace(ns)
