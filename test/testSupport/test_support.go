@@ -10,6 +10,7 @@ import (
 	olmV1 "github.com/operator-framework/api/pkg/operators/v1"
 	olmV1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/sirupsen/logrus"
+	v1beta12 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	tektonTriggers "github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
 	"io"
 	"net/http"
@@ -44,6 +45,7 @@ func init() {
 	routev1.AddToScheme(TestClient.GetScheme())
 	tektonTriggers.AddToScheme(TestClient.GetScheme())
 	configv1.AddToScheme(TestClient.GetScheme())
+	v1beta12.AddToScheme(TestClient.GetScheme())
 
 }
 
