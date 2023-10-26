@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "github.com/openshift/api/route/v1"
+	v1beta12 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
 	v12 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -162,6 +163,24 @@ var _ = Describe("gitsign test", Ordered, func() {
 				Expect(commit.PGPSignature).To(Not(BeNil()))
 			})
 		})
+
+		Describe("verify pipeline run was executed", func() {
+			It("pipeline run is successful", func() {
+
+				Eventually(func() []v1beta12.PipelineRun {
+					pipelineRuns := &v1beta12.PipelineRunList{}
+					testSupport.TestClient.List(testSupport.TestContext, pipelineRuns,
+						controller.InNamespace(support.TestNamespace),
+						controller.MatchingLabels{"tekton.dev/pipeline": "verify-source-code-pipeline"},
+					)
+					return pipelineRuns.Items
+				}, testSupport.TestTimeoutMedium).Should(And(HaveLen(1), WithTransform(func(list []v1beta12.PipelineRun) bool {
+					return list[0].Status.GetCondition("Succeeded").IsTrue()
+				}, BeTrue())))
+
+			})
+		})
+
 	})
 })
 
@@ -179,7 +198,7 @@ func createTriggerBindingResource(ns string) *v1beta1.TriggerBinding {
 				},
 				{
 					Name:  "fulcio-crt-pem-url",
-					Value: tas.TufURL + "/targets/fulcio_v1.crt.pem",
+					Value: tas.TufURL + "/targets/fulcio-cert",
 				},
 				{
 					Name:  "rekor-url",
@@ -199,7 +218,11 @@ func createTriggerBindingResource(ns string) *v1beta1.TriggerBinding {
 				},
 				{
 					Name:  "rekor-public-key",
-					Value: tas.TufURL + "/targets/rekor.pub",
+					Value: tas.TufURL + "/targets/rekor-pubkey",
+				},
+				{
+					Name:  "ctfe-public-key",
+					Value: tas.TufURL + "/targets/ctfe.pub",
 				},
 			},
 		},
