@@ -15,76 +15,59 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"sigstore-e2e-test/pkg/client"
-	"sigstore-e2e-test/pkg/support"
+	"sigstore-e2e-test/pkg/api"
+	"sigstore-e2e-test/pkg/kubernetes"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
 var (
-	TestClient        client.Client
 	TestContext       context.Context
 	TestTimeoutMedium = 5 * time.Minute
 )
 
-var prerequistities []support.TestPrerequisite
+var installedStack []api.TestPrerequisite = make([]api.TestPrerequisite, 0)
 
 func init() {
+	TestContext = context.TODO()
+
 	var err error
 
-	TestContext = context.TODO()
-	if TestClient, err = client.NewClient(); err != nil {
+	// Initialization of kubernetes client
+	if kubernetes.K8sClient, err = kubernetes.NewClient(); err != nil {
 		panic(err)
 	}
 
-	olmV1alpha1.AddToScheme(TestClient.GetScheme())
-	olmV1.AddToScheme(TestClient.GetScheme())
-	projectv1.AddToScheme(TestClient.GetScheme())
-	routev1.AddToScheme(TestClient.GetScheme())
-	tektonTriggers.AddToScheme(TestClient.GetScheme())
-	configv1.AddToScheme(TestClient.GetScheme())
-	v1beta12.AddToScheme(TestClient.GetScheme())
-
+	olmV1alpha1.AddToScheme(kubernetes.K8sClient.GetScheme())
+	olmV1.AddToScheme(kubernetes.K8sClient.GetScheme())
+	projectv1.AddToScheme(kubernetes.K8sClient.GetScheme())
+	routev1.AddToScheme(kubernetes.K8sClient.GetScheme())
+	tektonTriggers.AddToScheme(kubernetes.K8sClient.GetScheme())
+	configv1.AddToScheme(kubernetes.K8sClient.GetScheme())
+	v1beta12.AddToScheme(kubernetes.K8sClient.GetScheme())
 }
 
-func InstallPrerequisites(prerequisite ...support.TestPrerequisite) error {
-	prerequistities = prerequisite
-	wg := new(sync.WaitGroup)
-	wg.Add(len(prerequisite))
-	var errors []error
-	for _, i := range prerequisite {
-		go func(p support.TestPrerequisite) {
-			err := p.Install(TestClient)
-			if err != nil {
-				errors = append(errors, err)
-			}
-			wg.Done()
-		}(i)
-	}
-	wg.Wait()
-	if len(errors) != 0 {
-		return fmt.Errorf("can't install all prerequisities %s", errors)
+func InstallPrerequisites(prerequisite ...api.TestPrerequisite) error {
+	for _, p := range prerequisite {
+		err := p.Setup()
+		if err != nil {
+			return err
+		}
+		installedStack = append(installedStack, p)
 	}
 	return nil
 }
 
 func DestroyPrerequisites() error {
-	wg := new(sync.WaitGroup)
-	wg.Add(len(prerequistities))
 	var errors []error
-	for _, i := range prerequistities {
-		go func(prerequisite support.TestPrerequisite) {
-			err := prerequisite.Destroy(TestClient)
-			if err != nil {
-				logrus.Warn(err)
-				errors = append(errors, err)
-			}
-			wg.Done()
-		}(i)
+	for i := len(installedStack) - 1; i >= 0; i-- {
+		err := installedStack[i].Destroy()
+		if err != nil {
+			logrus.Warn(err)
+			errors = append(errors, err)
+		}
 	}
-	wg.Wait()
 	if len(errors) != 0 {
 		return fmt.Errorf("can't destroy all prerequisities %s", errors)
 	}
