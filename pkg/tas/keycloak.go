@@ -5,85 +5,73 @@ import (
 	v1 "github.com/openshift/api/route/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"os"
 	controller "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigstore-e2e-test/pkg/client"
+	"sigstore-e2e-test/pkg/api"
+	"sigstore-e2e-test/pkg/kubernetes"
+	"sigstore-e2e-test/pkg/kubernetes/keycloak"
+	"sigstore-e2e-test/pkg/support"
 	"time"
 )
 
 const (
-	SUBSCRIPTION_NAME = "sigstore-keycloak"
-	PACKAGE_NAME      = "rhsso-operator"
-	CHANNEL           = "stable"
-	SOURCE            = "redhat-operators"
-	SOURCE_NAMESPACE  = "openshift-marketplace"
-	TARGET_NAMESPACE  = "keycloak-system"
-	OIDC_REALM        = "sigstore"
+	OIDC_REALM = "sigstore"
 )
 
-var (
-	keycloakPreinstalled bool
-	resourcesDir         string
-	OidcIssuerURL        string
-)
-
-type KeycloakInstaller struct {
+type KeycloakTas struct {
 	ctx             context.Context
+	keyclock        *keycloak.OperatorInstaller
+	tas             *SigstoreOcp
 	createResources bool
+	resourcesDir    string
+	preinstalled    bool
 }
 
-func NewKeycloakInstaller(ctx context.Context, createResources bool) *KeycloakInstaller {
-	return &KeycloakInstaller{
+func NewKeycloakTas(ctx context.Context, keycloak *keycloak.OperatorInstaller, tas *SigstoreOcp, createResource bool) *KeycloakTas {
+	return &KeycloakTas{
 		ctx:             ctx,
-		createResources: createResources,
+		keyclock:        keycloak,
+		tas:             tas,
+		createResources: createResource,
 	}
 }
 
-func (p KeycloakInstaller) isRunning(c client.Client) (bool, error) {
-	OidcIssuerURL = os.Getenv("OIDC_ISSUER_URL")
-	if OidcIssuerURL != "" {
-		return true, nil
+func (i *KeycloakTas) IsReady() (bool, error) {
+	routeKey := controller.ObjectKey{
+		Namespace: i.keyclock.Subscription.TargetNamespace,
+		Name:      "keycloak",
 	}
-	l, err := c.CoreV1().Pods(TARGET_NAMESPACE).List(p.ctx, metav1.ListOptions{
-		LabelSelector: "name=rhsso-operator",
-	},
-	)
-	if err != nil {
+	route := &v1.Route{}
+	if err := kubernetes.K8sClient.Get(i.ctx, routeKey, route); err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
 		return false, err
 	}
-	if len(l.Items) == 0 {
-		return false, err
-	}
-	if err = p.resolveIssuerUrl(c); err != nil {
-		return false, err
-	}
-	return true, nil
+
+	return route.Status.Ingress[0].Host != "", nil
 }
 
-func (p KeycloakInstaller) Install(c client.Client) error {
+func (i *KeycloakTas) Setup() error {
 	var err error
-	keycloakPreinstalled, err = p.isRunning(c)
+	i.preinstalled, err = i.IsReady()
 	if err != nil {
 		return err
 	}
-	if keycloakPreinstalled {
-		logrus.Info("The RH-SSO-operator is already running - skipping installation.")
-		return nil
+	if i.preinstalled {
+		logrus.Info("RH-SSO instance is already running - skipping installation.")
+		return i.resolveRoutes()
 	}
 
-	logrus.Info("Installing RH-SSO system.")
-	err = c.CreateProject(p.ctx, TARGET_NAMESPACE)
+	logrus.Info("Installation of RH-SSO instance")
+	err = support.WaitUntilIsReady(i.ctx, 10*time.Second, 5*time.Minute, i.tas, i.keyclock)
 	if err != nil {
 		return err
 	}
-	if err := c.InstallFromOperatorHub(p.ctx, SUBSCRIPTION_NAME, TARGET_NAMESPACE, PACKAGE_NAME, CHANNEL, SOURCE, SOURCE_NAMESPACE); err != nil {
-		return err
-	}
-	if p.createResources {
-		resourcesDir = repoDir + "/keycloak/resources/base/"
-		entr, err := os.ReadDir(resourcesDir)
+
+	if i.createResources {
+		i.resourcesDir = i.tas.RepoDir + "/keycloak/resources/base/"
+		entr, err := os.ReadDir(i.resourcesDir)
 		if err != nil {
 			return err
 		}
@@ -91,46 +79,26 @@ func (p KeycloakInstaller) Install(c client.Client) error {
 			if e.Name() == "kustomization.yaml" {
 				continue
 			}
-			err := c.CreateResource(p.ctx, TARGET_NAMESPACE, resourcesDir+e.Name())
+			err := kubernetes.K8sClient.CreateResource(i.ctx, i.keyclock.Subscription.TargetNamespace, i.resourcesDir+e.Name())
 			if err != nil {
 				return err
 			}
 		}
 
-		routeKey := controller.ObjectKey{
-			Namespace: TARGET_NAMESPACE,
-			Name:      "keycloak",
-		}
-		// wait for keycloak route
-		route := &v1.Route{}
-		err = wait.PollUntilContextTimeout(p.ctx, 10*time.Second, 10*time.Minute, true, func(ctx context.Context) (done bool, err error) {
-			if err := c.Get(ctx, routeKey, route); err != nil {
-				if errors.IsNotFound(err) {
-					return false, nil
-				} else {
-					return false, err
-				}
-			}
-			return route.Status.Ingress[0].Host != "", nil
-		})
-		if err != nil {
-			return err
-		}
-		err = p.resolveIssuerUrl(c)
+		err = support.WaitUntilIsReady(i.ctx, 10*time.Second, 10*time.Minute, i)
 		if err != nil {
 			return err
 		}
 	}
-	return nil
+	return i.resolveRoutes()
 }
 
-func (p KeycloakInstaller) Destroy(c client.Client) error {
-	if keycloakPreinstalled {
-		logrus.Debug("Skipping preinstalled RH-SSO operator")
+func (i *KeycloakTas) Destroy() error {
+	if i.preinstalled {
+		logrus.Debug("Skipping preinstalled RH-SSO instance")
 		return nil
 	} else {
-		logrus.Info("Destroying RH-SSO")
-		entr, err := os.ReadDir(resourcesDir)
+		entr, err := os.ReadDir(i.resourcesDir)
 		if err != nil {
 			return err
 		}
@@ -138,28 +106,25 @@ func (p KeycloakInstaller) Destroy(c client.Client) error {
 			if e.Name() == "kustomization.yaml" {
 				continue
 			}
-			if err := c.DeleteResource(p.ctx, TARGET_NAMESPACE, resourcesDir+e.Name()); err != nil {
+			if err := kubernetes.K8sClient.DeleteResource(i.ctx, i.keyclock.Subscription.TargetNamespace, i.resourcesDir+e.Name()); err != nil {
 				return err
 			}
 		}
-
-		err = c.DeleteUsingOperatorHub(p.ctx, SUBSCRIPTION_NAME, TARGET_NAMESPACE)
-		_ = c.DeleteProject(p.ctx, TARGET_NAMESPACE)
-		return err
 	}
+	return nil
 }
 
-func (p KeycloakInstaller) resolveIssuerUrl(c client.Client) error {
+func (i *KeycloakTas) resolveRoutes() error {
 	routeKey := controller.ObjectKey{
-		Namespace: TARGET_NAMESPACE,
+		Namespace: i.keyclock.Subscription.TargetNamespace,
 		Name:      "keycloak",
 	}
 	route := &v1.Route{}
-	err := c.Get(p.ctx, routeKey, route)
+	err := kubernetes.K8sClient.Get(i.ctx, routeKey, route)
 	if err != nil {
 		return err
 	}
-	OidcIssuerURL = "https://" + route.Status.Ingress[0].Host + "/auth/realms/" + OIDC_REALM
-	return nil
 
+	api.OidcIssuerURL = "https://" + route.Status.Ingress[0].Host + "/auth/realms/" + OIDC_REALM
+	return nil
 }

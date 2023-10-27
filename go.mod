@@ -13,6 +13,7 @@ require (
 	github.com/openshift/api v0.0.0-20230817133225-564be9ddb58e
 	github.com/operator-framework/api v0.17.7
 	github.com/sirupsen/logrus v1.9.3
+	github.com/tektoncd/pipeline v0.44.0
 	github.com/tektoncd/triggers v0.23.1
 	k8s.io/api v0.27.4
 	k8s.io/apimachinery v0.27.4
@@ -135,7 +136,6 @@ require (
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/cobra v1.7.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/tektoncd/pipeline v0.44.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
