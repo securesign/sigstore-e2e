@@ -26,13 +26,19 @@ import (
 	"time"
 )
 
-const GITHUB_TOKEN = "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"
-const GITHUB_OWNER = "bouskaJ"
-const GITHUB_REPO = "gitsign-demo-test"
+var (
+	GithubToken    = os.Getenv("TEST_GITHUB_TOKEN")
+	GithubUsername = support.GetEnvOrDefault("TEST_GITHUB_USER", "ignore")
+	GithubOwner    = support.GetEnvOrDefault("TEST_GITHUB_OWNER", "securesign")
+	GithubRepo     = support.GetEnvOrDefault("TEST_GITHUB_REPO", "e2e-gitsign-test")
+)
 
 var _ = Describe("gitsign test", Ordered, func() {
+	if GithubToken == "" {
+		Skip("This test require TEST_GITHUB_TOKEN provided with GitHub access token")
+	}
 	var webhookUrl string
-	githubClient := github.NewClient(nil).WithAuthToken(GITHUB_TOKEN)
+	githubClient := github.NewClient(nil).WithAuthToken(GithubToken)
 	var webhook *github.Hook
 	BeforeAll(func() {
 		Expect(testSupport.InstallPrerequisites(
@@ -46,7 +52,7 @@ var _ = Describe("gitsign test", Ordered, func() {
 
 	AfterAll(func() {
 		if webhook != nil {
-			_, _ = githubClient.Repositories.DeleteHook(testSupport.TestContext, GITHUB_OWNER, GITHUB_REPO, *webhook.ID)
+			_, _ = githubClient.Repositories.DeleteHook(testSupport.TestContext, GithubOwner, GithubRepo, *webhook.ID)
 		}
 	})
 
@@ -94,7 +100,7 @@ var _ = Describe("gitsign test", Ordered, func() {
 				response *github.Response
 				err      error
 			)
-			webhook, response, err = githubClient.Repositories.CreateHook(testSupport.TestContext, GITHUB_OWNER, GITHUB_REPO, &github.Hook{
+			webhook, response, err = githubClient.Repositories.CreateHook(testSupport.TestContext, GithubOwner, GithubRepo, &github.Hook{
 				Name:   &hookName,
 				Config: hookConfig,
 				Events: []string{"push"},
@@ -111,7 +117,11 @@ var _ = Describe("gitsign test", Ordered, func() {
 				err    error
 			)
 			Context("with git repository", func() {
-				dir, repo, err = support.GitClone(fmt.Sprintf("https://github.com/%s/%s.git", GITHUB_OWNER, GITHUB_REPO))
+				dir, repo, err = support.GitCloneWithAuth(fmt.Sprintf("https://github.com/%s/%s.git", GithubOwner, GithubRepo),
+					&gitAuth.BasicAuth{
+						Username: GithubUsername,
+						Password: GithubToken,
+					})
 				Expect(err).To(BeNil())
 			})
 
@@ -148,8 +158,8 @@ var _ = Describe("gitsign test", Ordered, func() {
 
 				Expect(repo.Push(&git.PushOptions{
 					Auth: &gitAuth.BasicAuth{
-						Username: "ignore",
-						Password: GITHUB_TOKEN,
+						Username: GithubUsername,
+						Password: GithubToken,
 					}})).To(Succeed())
 
 				ref, err := repo.Head()
