@@ -30,7 +30,7 @@ const (
 	TUF_NAMESPACE     = "tuf-system"
 	CERT_PASSWORD     = "secretPassword"
 	RELEASE_NAME      = "trusted-artifact-signer"
-	RELEASE_NAMESPACE = "sigstore"
+	RELEASE_NAMESPACE = "trusted-artifact-signer"
 )
 
 var (
