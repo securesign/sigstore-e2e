@@ -56,8 +56,10 @@ func (p KeycloakInstaller) isRunning(c client.Client) (bool, error) {
 	if len(l.Items) == 0 {
 		return false, err
 	}
-	err = p.resolveIssuerUrl(c)
-	return true, err
+	if err = p.resolveIssuerUrl(c); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (p KeycloakInstaller) Install(c client.Client) error {
@@ -154,7 +156,10 @@ func (p KeycloakInstaller) resolveIssuerUrl(c client.Client) error {
 	}
 	route := &v1.Route{}
 	err := c.Get(p.ctx, routeKey, route)
+	if err != nil {
+		return err
+	}
 	OidcIssuerURL = "https://" + route.Status.Ingress[0].Host + "/auth/realms/" + OIDC_REALM
-	return err
+	return nil
 
 }

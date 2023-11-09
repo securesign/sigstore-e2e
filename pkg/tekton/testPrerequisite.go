@@ -4,8 +4,11 @@ import (
 	"context"
 	"github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigstore-e2e-test/pkg/client"
+	"time"
 )
 
 const (
@@ -54,7 +57,25 @@ func (p tektonPrerequisite) Install(c client.Client) error {
 	}
 	logrus.Info("Installing openshift-pipelines-operator.")
 	c.InstallFromOperatorHub(p.ctx, SUBSCRIPTION_NAME, TARGET_NAMESPACE, PACKAGE_NAME, CHANNEL, SOURCE, SOURCE_NAMESPACE)
-	return nil
+
+	return wait.PollUntilContextTimeout(p.ctx, 10*time.Second, 5*time.Minute, true, func(ctx context.Context) (done bool, err error) {
+		// check tekton resources
+		_, base := c.Discovery().ServerResourcesForGroupVersion("tekton.dev/v1beta1")
+		_, triggers := c.Discovery().ServerResourcesForGroupVersion("triggers.tekton.dev/v1beta1")
+
+		for _, e := range []error{base, triggers} {
+			if e != nil {
+				if errors.IsNotFound(e) {
+					return false, nil
+				}
+				if e != nil {
+					return false, e
+				}
+			}
+		}
+
+		return true, nil
+	})
 }
 
 func (p tektonPrerequisite) Destroy(c client.Client) error {
