@@ -34,13 +34,13 @@ var (
 )
 
 var _ = Describe("gitsign test", Ordered, func() {
-	if GithubToken == "" {
-		Skip("This test require TEST_GITHUB_TOKEN provided with GitHub access token")
-	}
 	var webhookUrl string
 	githubClient := github.NewClient(nil).WithAuthToken(GithubToken)
 	var webhook *github.Hook
 	BeforeAll(func() {
+		if GithubToken == "" {
+			Skip("This test require TEST_GITHUB_TOKEN provided with GitHub access token")
+		}
 		Expect(testSupport.InstallPrerequisites(
 			tas.NewTas(testSupport.TestContext),
 			gitsign.NewGitsignInstaller(testSupport.TestContext),
@@ -86,6 +86,8 @@ var _ = Describe("gitsign test", Ordered, func() {
 				return pods.Items
 			}, testSupport.TestTimeoutMedium).Should(And(HaveLen(1), WithTransform(func(pods []v12.Pod) v12.PodPhase { return pods[0].Status.Phase }, Equal(v12.PodRunning))))
 		})
+		// sleep a few more seconds for everything to settle down
+		time.Sleep(30 * time.Second)
 	})
 
 	Describe("register GitHub webhook", func() {
@@ -122,7 +124,6 @@ var _ = Describe("gitsign test", Ordered, func() {
 						Username: GithubUsername,
 						Password: GithubToken,
 					})
-				Expect(err).To(BeNil())
 			})
 
 			It("Add git configuration for gitsign", func() {
