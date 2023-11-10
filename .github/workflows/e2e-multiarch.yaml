@@ -1,0 +1,69 @@
+name: OS Matrix E2E Test
+on:
+  workflow_dispatch:
+
+env:
+  DOCKER_IMAGE: quay.io/redhat-user-workloads/rhtas-tenant/rhtas-stack-1-0-beta/client-server
+  DOCKER_IMAGE_VERSION: on-pr-d6800cce4b23319b33fd86e577285319c2e709ae
+
+jobs:
+  get-cli-binaries:
+    name: Get CLI binaries
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable cache with CLI binaries
+        id: cache-clients
+        uses: actions/cache@v3
+        with:
+          path: ./target/clients
+          key: clients-${{ env.DOCKER_IMAGE_VERSION }}
+          enableCrossOsArchive: true
+      - name: Prepare CLI binaries if not cached already
+        if: ${{ steps.cache-clients.outputs.cache-hit != 'true' }}
+        shell: bash
+        run: |
+          mkdir target
+          docker cp $(docker create --name client-server-con $DOCKER_IMAGE:$DOCKER_IMAGE_VERSION):/var/www/html/clients target && docker rm client-server-con
+          gunzip ./target/clients/darwin/rekor-cli.gz
+          gunzip ./target/clients/darwin/cosign.gz
+          gunzip ./target/clients/darwin/gitsign.gz
+          gunzip ./target/clients/windows/rekor-cli.gz
+          gunzip ./target/clients/windows/cosign.gz
+          gunzip ./target/clients/windows/gitsign.gz
+          gunzip ./target/clients/linux/rekor-cli.gz
+          gunzip ./target/clients/linux/cosign.gz
+          gunzip ./target/clients/linux/gitsign.gz
+
+  test-cli-binaries:
+    name: Test CLI binaries
+    needs: get-cli-binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore cache with CLI binaries
+        id: restore-clients
+        uses: actions/cache@v3
+        with:
+          path: ./target/clients
+          key: clients-${{ env.DOCKER_IMAGE_VERSION }}
+          enableCrossOsArchive: true
+          fail-on-cache-miss: true
+      - name: Cache not available error
+        if: ${{ steps.restore-clients.outputs.cache-hit != 'true' }}
+        shell: bash
+        run: |
+          echo "Cache with CLI binaries not found"
+          exit 1
+      - name: List CLI binaries
+        if: ${{ steps.restore-clients.outputs.cache-hit == 'true' }}
+        shell: bash
+        run: |
+          ls -la ./target/clients
+          find ./target/clients
