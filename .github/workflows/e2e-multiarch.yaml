@@ -17,24 +17,24 @@ jobs:
         id: cache-clients
         uses: actions/cache@v3
         with:
-          path: ./target/clients
+          path: ./command-line-tools/clients
           key: clients-${{ env.DOCKER_IMAGE_VERSION }}
           enableCrossOsArchive: true
       - name: Prepare CLI binaries if not cached already
         if: ${{ steps.cache-clients.outputs.cache-hit != 'true' }}
         shell: bash
         run: |
-          mkdir target
-          docker cp $(docker create --name client-server-con $DOCKER_IMAGE:$DOCKER_IMAGE_VERSION):/var/www/html/clients target && docker rm client-server-con
-          gunzip ./target/clients/darwin/rekor-cli.gz
-          gunzip ./target/clients/darwin/cosign.gz
-          gunzip ./target/clients/darwin/gitsign.gz
-          gunzip ./target/clients/windows/rekor-cli.gz
-          gunzip ./target/clients/windows/cosign.gz
-          gunzip ./target/clients/windows/gitsign.gz
-          gunzip ./target/clients/linux/rekor-cli.gz
-          gunzip ./target/clients/linux/cosign.gz
-          gunzip ./target/clients/linux/gitsign.gz
+          mkdir command-line-tools
+          docker cp $(docker create --name client-server-con $DOCKER_IMAGE:$DOCKER_IMAGE_VERSION):/var/www/html/clients command-line-tools && docker rm client-server-con
+          gunzip ./command-line-tools/clients/darwin/rekor-cli.gz
+          gunzip ./command-line-tools/clients/darwin/cosign.gz
+          gunzip ./command-line-tools/clients/darwin/gitsign.gz
+          gunzip ./command-line-tools/clients/windows/rekor-cli.gz
+          gunzip ./command-line-tools/clients/windows/cosign.gz
+          gunzip ./command-line-tools/clients/windows/gitsign.gz
+          gunzip ./command-line-tools/clients/linux/rekor-cli.gz
+          gunzip ./command-line-tools/clients/linux/cosign.gz
+          gunzip ./command-line-tools/clients/linux/gitsign.gz
 
   test-cli-binaries:
     name: Test CLI binaries
@@ -51,7 +51,7 @@ jobs:
         id: restore-clients
         uses: actions/cache@v3
         with:
-          path: ./target/clients
+          path: ./command-line-tools/clients
           key: clients-${{ env.DOCKER_IMAGE_VERSION }}
           enableCrossOsArchive: true
           fail-on-cache-miss: true
@@ -65,5 +65,4 @@ jobs:
         if: ${{ steps.restore-clients.outputs.cache-hit == 'true' }}
         shell: bash
         run: |
-          ls -la ./target/clients
-          find ./target/clients
+          find ./command-line-tools/clients
