@@ -23,6 +23,11 @@ func NewTestProject(ctx context.Context) *ProjectPrerequisite {
 	}
 }
 
+func (p ProjectPrerequisite) IsReady(c client.Client) bool {
+	// no-op
+	return true
+}
+
 func (p ProjectPrerequisite) Install(c client.Client) error {
 	TestNamespace = os.Getenv("TEST_NS")
 	if TestNamespace == "" {

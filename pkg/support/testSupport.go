@@ -10,6 +10,11 @@ import (
 type TestPrerequisite interface {
 	Install(c client.Client) error
 	Destroy(c client.Client) error
+	Readiness
+}
+
+type Readiness interface {
+	IsReady(c client.Client) bool
 }
 
 func GitClone(url string) (string, *git.Repository, error) {

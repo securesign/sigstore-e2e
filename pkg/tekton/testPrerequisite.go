@@ -32,49 +32,41 @@ func NewTektonInstaller(ctx context.Context) *tektonPrerequisite {
 	}
 }
 
-func (p tektonPrerequisite) isRunning(c client.Client) (bool, error) {
+func (p tektonPrerequisite) IsReady(c client.Client) bool {
 	csvs := &v1alpha1.ClusterServiceVersionList{}
 	if err := c.List(p.ctx, csvs, ctrl.InNamespace(TARGET_NAMESPACE), ctrl.HasLabels{"operators.coreos.com/openshift-pipelines-operator-rh.openshift-operators"}); err != nil {
-		return false, err
+		return false
 	}
 	for _, i := range csvs.Items {
-		if i.Status.Phase == "Succeeded" {
-			return true, nil
+		if i.Status.Phase != "Succeeded" {
+			return false
 		}
 	}
-	return false, nil
+	// check tekton resources
+	if _, base := c.Discovery().ServerResourcesForGroupVersion("tekton.dev/v1beta1"); errors.IsNotFound(base) {
+		return false
+	}
+
+	if _, triggers := c.Discovery().ServerResourcesForGroupVersion("triggers.tekton.dev/v1beta1"); errors.IsNotFound(triggers) {
+		return false
+	}
+	return true
 }
 
 func (p tektonPrerequisite) Install(c client.Client) error {
-	var err error
-	preinstalled, err = p.isRunning(c)
-	if err != nil {
-		return err
-	}
+	preinstalled = p.IsReady(c)
 	if preinstalled {
 		logrus.Info("The openshift-pipelines-operator is already running - skipping installation.")
 		return nil
 	}
 	logrus.Info("Installing openshift-pipelines-operator.")
-	c.InstallFromOperatorHub(p.ctx, SUBSCRIPTION_NAME, TARGET_NAMESPACE, PACKAGE_NAME, CHANNEL, SOURCE, SOURCE_NAMESPACE)
+	err := c.InstallFromOperatorHub(p.ctx, SUBSCRIPTION_NAME, TARGET_NAMESPACE, PACKAGE_NAME, CHANNEL, SOURCE, SOURCE_NAMESPACE)
+	if err != nil {
+		return err
+	}
 
 	return wait.PollUntilContextTimeout(p.ctx, 10*time.Second, 5*time.Minute, true, func(ctx context.Context) (done bool, err error) {
-		// check tekton resources
-		_, base := c.Discovery().ServerResourcesForGroupVersion("tekton.dev/v1beta1")
-		_, triggers := c.Discovery().ServerResourcesForGroupVersion("triggers.tekton.dev/v1beta1")
-
-		for _, e := range []error{base, triggers} {
-			if e != nil {
-				if errors.IsNotFound(e) {
-					return false, nil
-				}
-				if e != nil {
-					return false, e
-				}
-			}
-		}
-
-		return true, nil
+		return p.IsReady(c), nil
 	})
 }
 

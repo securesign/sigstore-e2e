@@ -15,6 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"math/big"
 	"os"
 	client2 "sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,30 +61,32 @@ func NewTas(ctx context.Context) *tasTestPrerequisite {
 	}
 }
 
-func (p tasTestPrerequisite) isRunning(c client.Client) (bool, error) {
+func (p tasTestPrerequisite) IsReady(c client.Client) bool {
 	FulcioURL = os.Getenv("FULCIO_URL")
 	RekorURL = os.Getenv("REKOR_URL")
 	TufURL = os.Getenv("TUF_URL")
 
 	if FulcioURL != "" && RekorURL != "" && TufURL != "" {
-		return true, nil
+		return true
 	}
 	if err := p.resolveRoutes(c); err != nil {
-		return false, nil
+		return false
 	}
-	return true, nil
+	return true
 }
 
 func (p tasTestPrerequisite) Install(c client.Client) error {
 	var err error
 	// check keycloak installation
 	keycloak = NewKeycloakInstaller(p.ctx, true)
-	err = keycloak.Install(c)
-	if err != nil {
-		return err
+	if !keycloak.IsReady(c) {
+		err = keycloak.Install(c)
+		if err != nil {
+			return err
+		}
 	}
 
-	preinstalled, err = p.isRunning(c)
+	preinstalled = p.IsReady(c)
 	if err != nil {
 		return err
 	}
@@ -144,11 +147,9 @@ func (p tasTestPrerequisite) Install(c client.Client) error {
 		Timeout:         8 * time.Minute,
 	}
 	_, err = p.helmCli.InstallOrUpgradeChart(p.ctx, chartSpec, &helmClient.GenericHelmOptions{})
-	if err != nil {
-		return err
-	}
-	err = p.resolveRoutes(c)
-	return err
+	return wait.PollUntilContextTimeout(p.ctx, 10*time.Second, 5*time.Minute, true, func(ctx context.Context) (done bool, err error) {
+		return p.IsReady(c), nil
+	})
 }
 
 func (p tasTestPrerequisite) Destroy(c client.Client) error {

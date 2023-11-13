@@ -18,17 +18,13 @@ func NewGitsignInstaller(ctx context.Context) *Gitsign {
 	}
 }
 
-func (p Gitsign) Install(c client.Client) error {
-	path, err := exec.LookPath("gitsign")
-	if err != nil {
-		return err
-	}
-	if path != "" {
-		// already installed
-		gitsignPath = path
-		return nil
-	}
+func (p Gitsign) IsReady(_ client.Client) bool {
+	path, _ := exec.LookPath("gitsign")
+	return path != ""
+}
 
+func (p Gitsign) Install(_ client.Client) error {
+	// TODO: use PROD cli
 	return exec.CommandContext(p.ctx, "go", "install", "github.com/sigstore/gitsign@latest").Run()
 }
 

@@ -14,6 +14,10 @@ func GitWithGitSign(ctx context.Context, workdir string, signToken string, args 
 	if err != nil {
 		return err
 	}
+	gitsignPath, err := exec.LookPath("gitsign")
+	if err != nil {
+		return err
+	}
 	cmd.Env = append(cmd.Env, fmt.Sprintf("SIGSTORE_ID_TOKEN=%s", signToken), "PATH="+filepath.Dir(gitsignPath)+":"+filepath.Dir(gitPath))
 	cmd.Dir = workdir
 	cmd.Stdout = os.Stdout

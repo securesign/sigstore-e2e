@@ -7,8 +7,6 @@ import (
 	"sigstore-e2e-test/pkg/support"
 )
 
-var cosign string
-
 const COSIGN_REPO = "https://github.com/sigstore/cosign"
 
 type cosignInstaller struct {
@@ -21,17 +19,17 @@ func NewCosign(ctx context.Context) *cosignInstaller {
 	}
 }
 
+func (p cosignInstaller) IsReady(_ client.Client) bool {
+	path, _ := exec.LookPath("cosign")
+	return path != ""
+}
+
 func (p cosignInstaller) Install(c client.Client) error {
-	path, err := exec.LookPath("cosign")
-	if err != nil {
-		return err
-	}
-	if path != "" {
-		// already installed
-		cosign = path
+	if p.IsReady(c) {
 		return nil
 	}
 
+	// TODO: use PROD cli
 	dir, _, err := support.GitClone(COSIGN_REPO)
 	if err != nil {
 		return err

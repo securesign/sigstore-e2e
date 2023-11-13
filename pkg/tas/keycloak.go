@@ -4,7 +4,6 @@ import (
 	"context"
 	v1 "github.com/openshift/api/route/v1"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"os"
@@ -41,40 +40,33 @@ func NewKeycloakInstaller(ctx context.Context, createResources bool) *KeycloakIn
 	}
 }
 
-func (p KeycloakInstaller) isRunning(c client.Client) (bool, error) {
+func (p KeycloakInstaller) IsReady(c client.Client) bool {
 	OidcIssuerURL = os.Getenv("OIDC_ISSUER_URL")
 	if OidcIssuerURL != "" {
-		return true, nil
+		return true
 	}
-	l, err := c.CoreV1().Pods(TARGET_NAMESPACE).List(p.ctx, metav1.ListOptions{
+	l, _ := c.CoreV1().Pods(TARGET_NAMESPACE).List(p.ctx, metav1.ListOptions{
 		LabelSelector: "name=rhsso-operator",
-	},
-	)
-	if err != nil {
-		return false, err
-	}
+	})
 	if len(l.Items) == 0 {
-		return false, err
+		return false
 	}
-	if err = p.resolveIssuerUrl(c); err != nil {
-		return false, err
+	if !p.createResources {
+		return true
 	}
-	return true, nil
+	return p.resolveIssuerUrl(c) == nil
 }
 
 func (p KeycloakInstaller) Install(c client.Client) error {
-	var err error
-	keycloakPreinstalled, err = p.isRunning(c)
-	if err != nil {
-		return err
-	}
+	keycloakPreinstalled = p.IsReady(c)
+
 	if keycloakPreinstalled {
 		logrus.Info("The RH-SSO-operator is already running - skipping installation.")
 		return nil
 	}
 
 	logrus.Info("Installing RH-SSO system.")
-	err = c.CreateProject(p.ctx, TARGET_NAMESPACE)
+	err := c.CreateProject(p.ctx, TARGET_NAMESPACE)
 	if err != nil {
 		return err
 	}
@@ -96,32 +88,10 @@ func (p KeycloakInstaller) Install(c client.Client) error {
 				return err
 			}
 		}
-
-		routeKey := controller.ObjectKey{
-			Namespace: TARGET_NAMESPACE,
-			Name:      "keycloak",
-		}
-		// wait for keycloak route
-		route := &v1.Route{}
-		err = wait.PollUntilContextTimeout(p.ctx, 10*time.Second, 10*time.Minute, true, func(ctx context.Context) (done bool, err error) {
-			if err := c.Get(ctx, routeKey, route); err != nil {
-				if errors.IsNotFound(err) {
-					return false, nil
-				} else {
-					return false, err
-				}
-			}
-			return route.Status.Ingress[0].Host != "", nil
-		})
-		if err != nil {
-			return err
-		}
-		err = p.resolveIssuerUrl(c)
-		if err != nil {
-			return err
-		}
 	}
-	return nil
+	return wait.PollUntilContextTimeout(p.ctx, 10*time.Second, 5*time.Minute, true, func(ctx context.Context) (done bool, err error) {
+		return p.IsReady(c), nil
+	})
 }
 
 func (p KeycloakInstaller) Destroy(c client.Client) error {
