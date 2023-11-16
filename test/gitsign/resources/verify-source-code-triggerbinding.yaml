@@ -1,0 +1,9 @@
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: verify-source-code-triggerbinding
+spec:
+  params:
+    - name: oidc-user-email
+      value: jdoe@redhat.com
+

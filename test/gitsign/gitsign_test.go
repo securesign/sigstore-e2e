@@ -68,6 +68,7 @@ var _ = Describe("gitsign test", Ordered, func() {
 			Expect(testSupport.TestClient.CreateResource(testSupport.TestContext, support.TestNamespace, path+"/verify-source-el-route.yaml")).To(Succeed())
 			Expect(testSupport.TestClient.CreateResource(testSupport.TestContext, support.TestNamespace, path+"/webhook-secret-securesign-pipelines-demo.yaml")).To(Succeed())
 			Expect(testSupport.TestClient.CreateResource(testSupport.TestContext, support.TestNamespace, path+"/github-push-triggerbinding.yaml")).To(Succeed())
+			Expect(testSupport.TestClient.CreateResource(testSupport.TestContext, support.TestNamespace, path+"/verify-source-code-triggerbinding.yaml")).To(Succeed())
 			Expect(testSupport.TestClient.Create(testSupport.TestContext, createTriggerBindingResource(support.TestNamespace))).To(Succeed())
 
 			route := &v1.Route{}
@@ -198,7 +199,7 @@ var _ = Describe("gitsign test", Ordered, func() {
 func createTriggerBindingResource(ns string) *v1beta1.TriggerBinding {
 	return &v1beta1.TriggerBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "sigstore-triggerbinding",
+			Name:      "trusted-artifact-signer-triggerbinding",
 			Namespace: ns,
 		},
 		Spec: v1beta1.TriggerBindingSpec{
