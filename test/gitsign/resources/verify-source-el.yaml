@@ -2,28 +2,31 @@ apiVersion: triggers.tekton.dev/v1alpha1
 kind: EventListener
 metadata:
   name: verify-source
+  namespace: securesign-pipelines-demo
 spec:
   resources:
     kubernetesResource:
       replicas: 1
   serviceAccountName: pipeline
-  triggers: 
+  triggers:
     - bindings:
         - kind: TriggerBinding
           ref: github-push-triggerbinding
         - kind: TriggerBinding
-          ref: sigstore-triggerbinding
+          ref: trusted-artifact-signer-triggerbinding
+        - kind: TriggerBinding
+          ref: verify-source-code-triggerbinding
       interceptors:
         - params:
             - name: secretRef
               value:
                 secretKey: webhook-secret-key
-                secretName: webhook-secret-securesign-pipelines-demo
+                secretName: webhook-secret-verify-source-code-pipeline-demo
           ref:
             kind: ClusterInterceptor
             name: github
         - params:
-            - name: filter 
+            - name: filter
               value: >-
                 header.match('X-GitHub-Event', 'push')
             - name: overlays
@@ -34,5 +37,5 @@ spec:
             kind: ClusterInterceptor
             name: cel
       name: verify-source-code-trigger
-      template: 
+      template:
         ref: verify-source-code-triggertemplate
