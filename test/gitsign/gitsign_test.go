@@ -14,7 +14,6 @@ import (
 	"github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
 	v12 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -22,10 +21,7 @@ import (
 	"sigstore-e2e-test/pkg/api"
 	"sigstore-e2e-test/pkg/clients"
 	"sigstore-e2e-test/pkg/kubernetes"
-	"sigstore-e2e-test/pkg/kubernetes/keycloak"
-	"sigstore-e2e-test/pkg/kubernetes/tekton"
 	"sigstore-e2e-test/pkg/support"
-	"sigstore-e2e-test/pkg/tas"
 	"sigstore-e2e-test/test/testSupport"
 	"time"
 )
@@ -42,32 +38,19 @@ var _ = Describe("gitsign test", Ordered, func() {
 	githubClient := github.NewClient(nil).WithAuthToken(GithubToken)
 	var webhook *github.Hook
 
-	var sigstoreOcp = tas.NewSigstoreOcp(testSupport.TestContext)
-	var keycloak = keycloak.NewOperatorInstaller(testSupport.TestContext, nil)
-	var keycloakTas = tas.NewKeycloakTas(testSupport.TestContext, keycloak, sigstoreOcp, true)
-	var tasHelm = tas.NewHelmInstaller(testSupport.TestContext, sigstoreOcp)
 	var gitsign = clients.NewGitsign(testSupport.TestContext)
-	var tekton = tekton.NewOperatorInstaller(testSupport.TestContext, nil)
 	var testProject = kubernetes.NewTestProject(testSupport.TestContext, "", false)
 
-	var oidcIssuer *url.URL
 	BeforeAll(func() {
 		if GithubToken == "" {
 			Skip("This test require TEST_GITHUB_TOKEN provided with GitHub access token")
 		}
-		// prepare local prerequisites
+
 		Expect(testSupport.InstallPrerequisites(
-			sigstoreOcp,
 			gitsign,
-		)).To(Succeed())
-		// prepare openshift prerequisites
-		Expect(testSupport.InstallPrerequisites(
-			keycloak,
-			keycloakTas,
-			tasHelm,
-			tekton,
 			testProject,
 		)).To(Succeed())
+
 		DeferCleanup(func() { testSupport.DestroyPrerequisites() })
 	})
 
@@ -158,9 +141,9 @@ var _ = Describe("gitsign test", Ordered, func() {
 				config.Raw.AddOption("gpg", "x509", "program", "gitsign")
 				config.Raw.AddOption("gpg", "", "format", "x509")
 
-				config.Raw.AddOption("gitsign", "", "fulcio", api.FulcioURL)
-				config.Raw.AddOption("gitsign", "", "rekor", api.RekorURL)
-				config.Raw.AddOption("gitsign", "", "issuer", oidcIssuer.String())
+				config.Raw.AddOption("gitsign", "", "fulcio", api.Values.GetString(api.FulcioURL))
+				config.Raw.AddOption("gitsign", "", "rekor", api.Values.GetString(api.RekorURL))
+				config.Raw.AddOption("gitsign", "", "issuer", api.Values.GetString(api.OidcIssuerURL))
 
 				Expect(repo.SetConfig(config)).To(Succeed())
 			})
@@ -173,7 +156,7 @@ var _ = Describe("gitsign test", Ordered, func() {
 				_, err = worktree.Add(".")
 				Expect(err).To(BeNil())
 
-				token, err := testSupport.GetOIDCToken(api.OidcIssuerURL, "jdoe@redhat.com", "secure", tas.OIDC_REALM)
+				token, err := testSupport.GetOIDCToken(api.Values.GetString(api.OidcIssuerURL), "jdoe@redhat.com", "secure", api.Values.GetString(api.OidcRealm))
 				Expect(err).To(BeNil())
 				Expect(token).To(Not(BeEmpty()))
 
@@ -227,35 +210,35 @@ func createTriggerBindingResource(ns string) *v1beta1.TriggerBinding {
 			Params: []v1beta1.Param{
 				{
 					Name:  "fulcio-url",
-					Value: api.FulcioURL,
+					Value: api.Values.GetString(api.FulcioURL),
 				},
 				{
 					Name:  "fulcio-crt-pem-url",
-					Value: api.TufURL + "/targets/fulcio-cert",
+					Value: api.Values.GetString(api.TufURL) + "/targets/fulcio-cert",
 				},
 				{
 					Name:  "rekor-url",
-					Value: api.RekorURL,
+					Value: api.Values.GetString(api.RekorURL),
 				},
 				{
 					Name:  "issuer-url",
-					Value: api.OidcIssuerURL,
+					Value: api.Values.GetString(api.OidcIssuerURL),
 				},
 				{
 					Name:  "tuff-mirror",
-					Value: api.TufURL,
+					Value: api.Values.GetString(api.TufURL),
 				},
 				{
 					Name:  "tuff-root",
-					Value: api.TufURL + "/root.json",
+					Value: api.Values.GetString(api.TufURL) + "/root.json",
 				},
 				{
 					Name:  "rekor-public-key",
-					Value: api.TufURL + "/targets/rekor-pubkey",
+					Value: api.Values.GetString(api.TufURL) + "/targets/rekor-pubkey",
 				},
 				{
 					Name:  "ctfe-public-key",
-					Value: api.TufURL + "/targets/ctfe.pub",
+					Value: api.Values.GetString(api.TufURL) + "/targets/ctfe.pub",
 				},
 			},
 		},

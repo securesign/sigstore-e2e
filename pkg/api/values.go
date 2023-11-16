@@ -1,19 +1,21 @@
 package api
 
-import (
-	"os"
+import "github.com/spf13/viper"
+
+const (
+	FulcioURL     = "FULCIO_URL"
+	RekorURL      = "REKOR_URL"
+	TufURL        = "TUF_URL"
+	OidcIssuerURL = "OIDC_ISSUER_URL"
+	OidcRealm     = "KEYCLOAK_REALM"
+	KeycloakUrl   = "KEYCLOAK_URL"
 )
 
-var (
-	FulcioURL     string
-	RekorURL      string
-	TufURL        string
-	OidcIssuerURL string
-)
+var Values *viper.Viper
 
 func init() {
-	FulcioURL = os.Getenv("FULCIO_URL")
-	RekorURL = os.Getenv("REKOR_URL")
-	TufURL = os.Getenv("TUF_URL")
-	OidcIssuerURL = os.Getenv("OIDC_ISSUER_URL")
+	Values = viper.New()
+
+	viper.SetDefault(OidcRealm, "sigstore")
+	Values.AutomaticEnv()
 }
