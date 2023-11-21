@@ -18,10 +18,10 @@ import (
 	"path/filepath"
 	"runtime"
 	controller "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigstore-e2e-test/pkg/api"
+	"sigstore-e2e-test/pkg/clients"
+	"sigstore-e2e-test/pkg/kubernetes"
 	"sigstore-e2e-test/pkg/support"
-	"sigstore-e2e-test/pkg/tas"
-	"sigstore-e2e-test/pkg/tas/gitsign"
-	"sigstore-e2e-test/pkg/tekton"
 	"sigstore-e2e-test/test/testSupport"
 	"time"
 )
@@ -37,16 +37,20 @@ var _ = Describe("gitsign test", Ordered, func() {
 	var webhookUrl string
 	githubClient := github.NewClient(nil).WithAuthToken(GithubToken)
 	var webhook *github.Hook
+
+	var gitsign = clients.NewGitsign(testSupport.TestContext)
+	var testProject = kubernetes.NewTestProject(testSupport.TestContext, "", false)
+
 	BeforeAll(func() {
 		if GithubToken == "" {
 			Skip("This test require TEST_GITHUB_TOKEN provided with GitHub access token")
 		}
+
 		Expect(testSupport.InstallPrerequisites(
-			tas.NewTas(testSupport.TestContext),
-			gitsign.NewGitsignInstaller(testSupport.TestContext),
-			tekton.NewTektonInstaller(testSupport.TestContext),
-			support.NewTestProject(testSupport.TestContext),
+			gitsign,
+			testProject,
 		)).To(Succeed())
+
 		DeferCleanup(func() { testSupport.DestroyPrerequisites() })
 	})
 
@@ -61,20 +65,20 @@ var _ = Describe("gitsign test", Ordered, func() {
 			// use file definition for large tekton resources
 			_, b, _, _ := runtime.Caller(0)
 			path := filepath.Dir(b) + "/resources"
-			Expect(testSupport.TestClient.CreateResource(testSupport.TestContext, support.TestNamespace, path+"/verify-commit-signature-task.yaml")).To(Succeed())
-			Expect(testSupport.TestClient.CreateResource(testSupport.TestContext, support.TestNamespace, path+"/verify-source-code-pipeline.yaml")).To(Succeed())
-			Expect(testSupport.TestClient.CreateResource(testSupport.TestContext, support.TestNamespace, path+"/verify-source-code-triggertemplate.yaml")).To(Succeed())
-			Expect(testSupport.TestClient.CreateResource(testSupport.TestContext, support.TestNamespace, path+"/verify-source-el.yaml")).To(Succeed())
-			Expect(testSupport.TestClient.CreateResource(testSupport.TestContext, support.TestNamespace, path+"/verify-source-el-route.yaml")).To(Succeed())
-			Expect(testSupport.TestClient.CreateResource(testSupport.TestContext, support.TestNamespace, path+"/webhook-secret-securesign-pipelines-demo.yaml")).To(Succeed())
-			Expect(testSupport.TestClient.CreateResource(testSupport.TestContext, support.TestNamespace, path+"/github-push-triggerbinding.yaml")).To(Succeed())
-			Expect(testSupport.TestClient.CreateResource(testSupport.TestContext, support.TestNamespace, path+"/verify-source-code-triggerbinding.yaml")).To(Succeed())
-			Expect(testSupport.TestClient.Create(testSupport.TestContext, createTriggerBindingResource(support.TestNamespace))).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/verify-commit-signature-task.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/verify-source-code-pipeline.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/verify-source-code-triggertemplate.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/verify-source-el.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/verify-source-el-route.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/webhook-secret-securesign-pipelines-demo.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/github-push-triggerbinding.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/verify-source-code-triggerbinding.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.Create(testSupport.TestContext, createTriggerBindingResource(testProject.Namespace))).To(Succeed())
 
 			route := &v1.Route{}
 			Eventually(func() v1.Route {
-				testSupport.TestClient.Get(testSupport.TestContext, controller.ObjectKey{
-					Namespace: support.TestNamespace,
+				kubernetes.K8sClient.Get(testSupport.TestContext, controller.ObjectKey{
+					Namespace: testProject.Namespace,
 					Name:      "el-verify-source",
 				}, route)
 				return *route
@@ -82,7 +86,7 @@ var _ = Describe("gitsign test", Ordered, func() {
 			webhookUrl = route.Status.Ingress[0].Host
 
 			Eventually(func() []v12.Pod {
-				pods, _ := testSupport.TestClient.CoreV1().Pods(support.TestNamespace).List(testSupport.TestContext, metav1.ListOptions{
+				pods, _ := kubernetes.K8sClient.CoreV1().Pods(testProject.Namespace).List(testSupport.TestContext, metav1.ListOptions{
 					LabelSelector: "eventlistener=verify-source"})
 				return pods.Items
 			}, testSupport.TestTimeoutMedium).Should(And(HaveLen(1), WithTransform(func(pods []v12.Pod) v12.PodPhase { return pods[0].Status.Phase }, Equal(v12.PodRunning))))
@@ -137,9 +141,9 @@ var _ = Describe("gitsign test", Ordered, func() {
 				config.Raw.AddOption("gpg", "x509", "program", "gitsign")
 				config.Raw.AddOption("gpg", "", "format", "x509")
 
-				config.Raw.AddOption("gitsign", "", "fulcio", tas.FulcioURL)
-				config.Raw.AddOption("gitsign", "", "rekor", tas.RekorURL)
-				config.Raw.AddOption("gitsign", "", "issuer", tas.OidcIssuerURL)
+				config.Raw.AddOption("gitsign", "", "fulcio", api.Values.GetString(api.FulcioURL))
+				config.Raw.AddOption("gitsign", "", "rekor", api.Values.GetString(api.RekorURL))
+				config.Raw.AddOption("gitsign", "", "issuer", api.Values.GetString(api.OidcIssuerURL))
 
 				Expect(repo.SetConfig(config)).To(Succeed())
 			})
@@ -152,11 +156,11 @@ var _ = Describe("gitsign test", Ordered, func() {
 				_, err = worktree.Add(".")
 				Expect(err).To(BeNil())
 
-				token, err := testSupport.GetOIDCToken(tas.OidcIssuerURL, "jdoe@redhat.com", "secure", tas.OIDC_REALM)
+				token, err := testSupport.GetOIDCToken(api.Values.GetString(api.OidcIssuerURL), "jdoe@redhat.com", "secure", api.Values.GetString(api.OidcRealm))
 				Expect(err).To(BeNil())
 				Expect(token).To(Not(BeEmpty()))
 
-				Expect(gitsign.GitWithGitSign(testSupport.TestContext, dir, token, "commit", "-m", "CI commit "+time.Now().String())).To(Succeed())
+				Expect(gitsign.GitWithGitSign(dir, token, "commit", "-m", "CI commit "+time.Now().String())).To(Succeed())
 
 				Expect(repo.Push(&git.PushOptions{
 					Auth: &gitAuth.BasicAuth{
@@ -181,8 +185,8 @@ var _ = Describe("gitsign test", Ordered, func() {
 
 				Eventually(func() []v1beta12.PipelineRun {
 					pipelineRuns := &v1beta12.PipelineRunList{}
-					testSupport.TestClient.List(testSupport.TestContext, pipelineRuns,
-						controller.InNamespace(support.TestNamespace),
+					kubernetes.K8sClient.List(testSupport.TestContext, pipelineRuns,
+						controller.InNamespace(testProject.Namespace),
 						controller.MatchingLabels{"tekton.dev/pipeline": "verify-source-code-pipeline"},
 					)
 					return pipelineRuns.Items
@@ -206,35 +210,35 @@ func createTriggerBindingResource(ns string) *v1beta1.TriggerBinding {
 			Params: []v1beta1.Param{
 				{
 					Name:  "fulcio-url",
-					Value: tas.FulcioURL,
+					Value: api.Values.GetString(api.FulcioURL),
 				},
 				{
 					Name:  "fulcio-crt-pem-url",
-					Value: tas.TufURL + "/targets/fulcio-cert",
+					Value: api.Values.GetString(api.TufURL) + "/targets/fulcio-cert",
 				},
 				{
 					Name:  "rekor-url",
-					Value: tas.RekorURL,
+					Value: api.Values.GetString(api.RekorURL),
 				},
 				{
 					Name:  "issuer-url",
-					Value: tas.OidcIssuerURL,
+					Value: api.Values.GetString(api.OidcIssuerURL),
 				},
 				{
 					Name:  "tuff-mirror",
-					Value: tas.TufURL,
+					Value: api.Values.GetString(api.TufURL),
 				},
 				{
 					Name:  "tuff-root",
-					Value: tas.TufURL + "/root.json",
+					Value: api.Values.GetString(api.TufURL) + "/root.json",
 				},
 				{
 					Name:  "rekor-public-key",
-					Value: tas.TufURL + "/targets/rekor-pubkey",
+					Value: api.Values.GetString(api.TufURL) + "/targets/rekor-pubkey",
 				},
 				{
 					Name:  "ctfe-public-key",
-					Value: tas.TufURL + "/targets/ctfe.pub",
+					Value: api.Values.GetString(api.TufURL) + "/targets/ctfe.pub",
 				},
 			},
 		},
