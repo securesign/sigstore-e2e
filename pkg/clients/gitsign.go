@@ -15,10 +15,9 @@ type Gitsign struct {
 func NewGitsign(ctx context.Context) *Gitsign {
 	return &Gitsign{
 		&cli{
-			Name:      "gitsign",
-			ctx:       ctx,
-			gitUrl:    "https://github.com/securesign/gitsign",
-			gitBranch: "redhat-v0.7.1",
+			Name:  "gitsign",
+			ctx:   ctx,
+			setup: DownloadFromOpenshift("gitsign"),
 		}}
 }
 

@@ -11,9 +11,8 @@ type Cosign struct {
 func NewCosign(ctx context.Context) *Cosign {
 	return &Cosign{
 		&cli{
-			Name:      "cosign",
-			ctx:       ctx,
-			gitUrl:    "https://github.com/securesign/cosign",
-			gitBranch: "redhat-v2.1.1",
+			Name:  "cosign",
+			ctx:   ctx,
+			setup: DownloadFromOpenshift("cosign"),
 		}}
 }

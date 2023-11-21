@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	configv1 "github.com/openshift/api/config/v1"
+	consoleCli "github.com/openshift/api/console/v1"
 	projectv1 "github.com/openshift/api/project/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	olmV1 "github.com/operator-framework/api/pkg/operators/v1"
@@ -46,6 +47,7 @@ func init() {
 	tektonTriggers.AddToScheme(kubernetes.K8sClient.GetScheme())
 	configv1.AddToScheme(kubernetes.K8sClient.GetScheme())
 	v1beta12.AddToScheme(kubernetes.K8sClient.GetScheme())
+	consoleCli.AddToScheme(kubernetes.K8sClient.GetScheme())
 }
 
 func InstallPrerequisites(prerequisite ...api.TestPrerequisite) error {
