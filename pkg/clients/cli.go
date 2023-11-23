@@ -53,17 +53,30 @@ func BuildFromGit(url string, branch string) SetupStrategy {
 
 func DownloadFromOpenshift(consoleCliDownloadName string) SetupStrategy {
 	return func(c *cli) (string, error) {
+		// Get http link
 		link, err := kubernetes.ConsoleCLIDownload(c.ctx, consoleCliDownloadName, runtime.GOOS)
 		if err != nil {
 			return "", err
 		}
 
-		file, err := support.DownloadAndUnzip(link)
+		tmp, err := os.MkdirTemp("", consoleCliDownloadName)
 		if err != nil {
 			return "", err
 		}
-		err = os.Chmod(file, 711)
-		return file, err
+
+		logrus.Info("Downloading ", consoleCliDownloadName, " from ", link)
+		fileName := tmp + string(os.PathSeparator) + consoleCliDownloadName
+		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 711)
+		if err != nil {
+			return "", err
+		}
+		defer file.Close()
+
+		if err = support.DownloadAndUnzip(link, file); err != nil {
+			return "", err
+		}
+
+		return file.Name(), err
 	}
 
 }

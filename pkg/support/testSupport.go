@@ -2,14 +2,14 @@ package support
 
 import (
 	"compress/gzip"
+	"fmt"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
-	"strings"
+	"time"
 )
 
 func GitClone(url string, branch string) (string, *git.Repository, error) {
@@ -43,27 +43,40 @@ func GetEnvOrDefault(key, fallback string) string {
 	return fallback
 }
 
-func DownloadAndUnzip(link string) (string, error) {
-	client := &http.Client{}
-	resp, _ := client.Get(link)
+func DownloadAndUnzip(link string, writer io.Writer) error {
+	pr, pw := io.Pipe()
+
+	go func() {
+		defer pw.Close()
+		if _, err := Download(link, pw); err != nil {
+			panic(err)
+		}
+
+	}()
+	return Gunzip(pr, writer)
+}
+
+func Download(link string, writer io.Writer) (int64, error) {
+	client := &http.Client{Timeout: 2 * time.Minute}
+	resp, err := client.Get(link)
+	if err != nil {
+		return 0, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("bad status: %s", resp.Status)
+	}
 	defer resp.Body.Close()
+	return io.Copy(writer, resp.Body)
+}
 
-	file, err := os.CreateTemp("", strings.TrimSuffix(filepath.Base(link), filepath.Ext(filepath.Base(link))))
-	defer file.Close()
-
+func Gunzip(reader io.Reader, writer io.Writer) error {
+	gzreader, err := gzip.NewReader(reader)
 	if err != nil {
-		return "", err
+		return err
 	}
-
-	gzreader, err := gzip.NewReader(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	_, err = io.Copy(file, gzreader)
 	defer gzreader.Close()
-	if err != nil {
-		return "", err
-	}
-	return file.Name(), nil
+
+	_, err = io.Copy(writer, gzreader)
+	return err
 }
