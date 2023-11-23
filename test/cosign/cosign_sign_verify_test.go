@@ -40,15 +40,16 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 		var pull io.ReadCloser
 		pull, err = cli.ImagePull(testSupport.TestContext, testImage, types.ImagePullOptions{})
+		Expect(err).To(BeNil())
 		io.Copy(os.Stdout, pull)
 		defer pull.Close()
 
 		Expect(cli.ImageTag(testSupport.TestContext, testImage, targetImageName)).To(Succeed())
 		var push io.ReadCloser
 		push, err = cli.ImagePush(testSupport.TestContext, targetImageName, types.ImagePushOptions{RegistryAuth: types.RegistryAuthFromSpec})
+		Expect(err).To(BeNil())
 		io.Copy(os.Stdout, push)
 		defer push.Close()
-		Expect(err).To(BeNil())
 		// wait for a while to be sure that the image landed in the registry
 		time.Sleep(10 * time.Second)
 	})
