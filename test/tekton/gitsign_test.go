@@ -1,4 +1,4 @@
-package gitsign
+package tekton
 
 import (
 	"fmt"
