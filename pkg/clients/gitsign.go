@@ -3,7 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
-	"os"
+	"github.com/sirupsen/logrus"
 	"os/exec"
 	"path/filepath"
 )
@@ -29,8 +29,8 @@ func (c *Gitsign) GitWithGitSign(workdir string, signToken string, args ...strin
 	}
 	cmd.Env = append(cmd.Env, fmt.Sprintf("SIGSTORE_ID_TOKEN=%s", signToken), "PATH="+filepath.Dir(c.pathToCLI)+":"+filepath.Dir(gitPath))
 	cmd.Dir = workdir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stdout
+	cmd.Stdout = logrus.NewEntry(logrus.StandardLogger()).WithField("app", "git").WriterLevel(logrus.InfoLevel)
+	cmd.Stderr = logrus.NewEntry(logrus.StandardLogger()).WithField("app", "git").WriterLevel(logrus.ErrorLevel)
 
 	return cmd.Run()
 }

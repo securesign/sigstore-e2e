@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"errors"
+	"github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
 	"runtime"
@@ -21,8 +22,10 @@ type SetupStrategy func(*cli) (string, error)
 
 func (c *cli) Command(args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(c.ctx, c.pathToCLI, args...)
-	cmd.Stderr = os.Stdout
-	cmd.Stdout = os.Stdout
+
+	cmd.Stdout = logrus.NewEntry(logrus.StandardLogger()).WithField("app", c.Name).WriterLevel(logrus.InfoLevel)
+	cmd.Stderr = logrus.NewEntry(logrus.StandardLogger()).WithField("app", c.Name).WriterLevel(logrus.ErrorLevel)
+
 	return cmd
 }
 
