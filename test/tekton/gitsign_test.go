@@ -28,25 +28,31 @@ import (
 	controller "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
-	GithubToken    = os.Getenv("TEST_GITHUB_TOKEN")
-	GithubUsername = support.GetEnvOrDefault("TEST_GITHUB_USER", "ignore")
-	GithubOwner    = support.GetEnvOrDefault("TEST_GITHUB_OWNER", "securesign")
-	GithubRepo     = support.GetEnvOrDefault("TEST_GITHUB_REPO", "e2e-gitsign-test")
-)
-
 var _ = Describe("gitsign test", Ordered, func() {
-	var webhookURL string
-	githubClient := github.NewClient(nil).WithAuthToken(GithubToken)
-	var webhook *github.Hook
-
-	var gitsign = clients.NewGitsign()
-	var testProject = kubernetes.NewTestProject("", false)
+	var (
+		GithubToken    = api.GetValueFor(api.GithubToken)
+		GithubUsername = api.GetValueFor(api.GithubUsername)
+		GithubOwner    = api.GetValueFor(api.GithubOwner)
+		GithubRepo     = api.GetValueFor(api.GithubRepo)
+		webhookURL     string
+		err            error
+		githubClient   *github.Client
+		webhook        *github.Hook
+		gitsign        *clients.Gitsign
+		testProject    *kubernetes.ProjectPrerequisite
+	)
 
 	BeforeAll(func() {
-		if GithubToken == "" {
-			Skip("This test require TEST_GITHUB_TOKEN provided with GitHub access token")
+		logrus.Debug("Mandatory configuration:")
+		err = testsupport.CheckApiConfigValues(testsupport.Mandatory, api.GithubToken, api.GithubUsername, api.GithubOwner, api.GithubRepo,
+			api.FulcioURL, api.RekorURL, api.OidcIssuerURL, api.TufURL, api.OidcRealm)
+		if err != nil {
+			Skip("Skip this test - " + err.Error())
 		}
+
+		githubClient = github.NewClient(nil).WithAuthToken(GithubToken)
+		gitsign = clients.NewGitsign()
+		testProject = kubernetes.NewTestProject("", false)
 
 		Expect(testsupport.InstallPrerequisites(
 			gitsign,
@@ -147,9 +153,9 @@ var _ = Describe("gitsign test", Ordered, func() {
 				config.Raw.AddOption("gpg", "x509", "program", "gitsign")
 				config.Raw.AddOption("gpg", "", "format", "x509")
 
-				config.Raw.AddOption("gitsign", "", "fulcio", api.Values.GetString(api.FulcioURL))
-				config.Raw.AddOption("gitsign", "", "rekor", api.Values.GetString(api.RekorURL))
-				config.Raw.AddOption("gitsign", "", "issuer", api.Values.GetString(api.OidcIssuerURL))
+				config.Raw.AddOption("gitsign", "", "fulcio", api.GetValueFor(api.FulcioURL))
+				config.Raw.AddOption("gitsign", "", "rekor", api.GetValueFor(api.RekorURL))
+				config.Raw.AddOption("gitsign", "", "issuer", api.GetValueFor(api.OidcIssuerURL))
 
 				Expect(repo.SetConfig(config)).To(Succeed())
 			})
@@ -162,7 +168,7 @@ var _ = Describe("gitsign test", Ordered, func() {
 				_, err = worktree.Add(".")
 				Expect(err).ToNot(HaveOccurred())
 
-				token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.Values.GetString(api.OidcIssuerURL), "jdoe@redhat.com", "secure", api.Values.GetString(api.OidcRealm))
+				token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.GetValueFor(api.OidcIssuerURL), "jdoe@redhat.com", "secure", api.GetValueFor(api.OidcRealm))
 				Expect(err).ToNot(HaveOccurred())
 				Expect(token).To(Not(BeEmpty()))
 
@@ -216,35 +222,35 @@ func createTriggerBindingResource(ns string) *v1beta1.TriggerBinding {
 			Params: []v1beta1.Param{
 				{
 					Name:  "fulcio-url",
-					Value: api.Values.GetString(api.FulcioURL),
+					Value: api.GetValueFor(api.FulcioURL),
 				},
 				{
 					Name:  "fulcio-crt-pem-url",
-					Value: api.Values.GetString(api.TufURL) + "/targets/fulcio-cert",
+					Value: api.GetValueFor(api.TufURL) + "/targets/fulcio-cert",
 				},
 				{
 					Name:  "rekor-url",
-					Value: api.Values.GetString(api.RekorURL),
+					Value: api.GetValueFor(api.RekorURL),
 				},
 				{
 					Name:  "issuer-url",
-					Value: api.Values.GetString(api.OidcIssuerURL),
+					Value: api.GetValueFor(api.OidcIssuerURL),
 				},
 				{
 					Name:  "tuff-mirror",
-					Value: api.Values.GetString(api.TufURL),
+					Value: api.GetValueFor(api.TufURL),
 				},
 				{
 					Name:  "tuff-root",
-					Value: api.Values.GetString(api.TufURL) + "/root.json",
+					Value: api.GetValueFor(api.TufURL) + "/root.json",
 				},
 				{
 					Name:  "rekor-public-key",
-					Value: api.Values.GetString(api.TufURL) + "/targets/rekor-pubkey",
+					Value: api.GetValueFor(api.TufURL) + "/targets/rekor-pubkey",
 				},
 				{
 					Name:  "ctfe-public-key",
-					Value: api.Values.GetString(api.TufURL) + "/targets/ctfe.pub",
+					Value: api.GetValueFor(api.TufURL) + "/targets/ctfe.pub",
 				},
 			},
 		},

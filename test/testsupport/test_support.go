@@ -3,6 +3,7 @@ package testsupport
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,6 +24,11 @@ import (
 	"github.com/sirupsen/logrus"
 	v1beta12 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	tektonTriggers "github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
+)
+
+const (
+	Mandatory bool = true
+	Optional  bool = false
 )
 
 var (
@@ -131,4 +137,24 @@ func GetOIDCToken(ctx context.Context, issuerURL string, userName string, passwo
 		return "", err
 	}
 	return fmt.Sprintf("%v", jsonOut["access_token"]), nil
+}
+
+func CheckApiConfigValues(failOnMissing bool, keys ...string) error {
+	mandatoryMissing := false
+	errorMessage := "Missing configuration for"
+	for _, key := range keys {
+		value := api.GetValueFor(key)
+		if value == "" && failOnMissing {
+			mandatoryMissing = true
+			errorMessage += " " + key
+			logrus.Warn(key, "=", value)
+		} else {
+			logrus.Info(key, "=", value)
+		}
+	}
+	if mandatoryMissing {
+		return errors.New(errorMessage)
+	} else {
+		return nil
+	}
 }

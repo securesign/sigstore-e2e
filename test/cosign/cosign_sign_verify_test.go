@@ -1,7 +1,6 @@
 package cosign
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"sigstore-e2e-test/pkg/api"
@@ -19,17 +18,23 @@ import (
 
 const testImage string = "alpine:latest"
 
-var cli *client.Client
-
 var _ = Describe("Cosign test", Ordered, func() {
 
-	fmt.Println(api.Values.GetString(api.FulcioURL))
-
-	var err error
-	var cosign = clients.NewCosign()
-
+	var (
+		err    error
+		cli    *client.Client
+		cosign *clients.Cosign
+	)
 	targetImageName := "ttl.sh/" + uuid.New().String() + ":5m"
+
 	BeforeAll(func() {
+		logrus.Debug("Mandatory configuration:")
+		err = testsupport.CheckApiConfigValues(testsupport.Mandatory, api.FulcioURL, api.RekorURL, api.TufURL, api.OidcIssuerURL, api.OidcRealm)
+		if err != nil {
+			Skip("Skip this test - " + err.Error())
+		}
+
+		cosign = clients.NewCosign()
 
 		Expect(testsupport.InstallPrerequisites(
 			cosign,
@@ -65,23 +70,23 @@ var _ = Describe("Cosign test", Ordered, func() {
 	Describe("Cosign initialize", func() {
 		It("should initialize the cosign root", func() {
 			Expect(cosign.Command(testsupport.TestContext, "initialize",
-				"--mirror="+api.Values.GetString(api.TufURL),
-				"--root="+api.Values.GetString(api.TufURL)+"/root.json").Run()).To(Succeed())
+				"--mirror="+api.GetValueFor(api.TufURL),
+				"--root="+api.GetValueFor(api.TufURL)+"/root.json").Run()).To(Succeed())
 		})
 	})
 
 	Describe("cosign sign", func() {
 		It("should sign the container", func() {
-			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.Values.GetString(api.OidcIssuerURL), "jdoe", "secure", api.Values.GetString(api.OidcRealm))
+			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.GetValueFor(api.OidcIssuerURL), "jdoe", "secure", api.GetValueFor(api.OidcRealm))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cosign.Command(testsupport.TestContext, "sign",
-				"-y", "--fulcio-url="+api.Values.GetString(api.FulcioURL), "--rekor-url="+api.Values.GetString(api.RekorURL), "--oidc-issuer="+api.Values.GetString(api.OidcIssuerURL), "--identity-token="+token, targetImageName).Run()).To(Succeed())
+				"-y", "--fulcio-url="+api.GetValueFor(api.FulcioURL), "--rekor-url="+api.GetValueFor(api.RekorURL), "--oidc-issuer="+api.GetValueFor(api.OidcIssuerURL), "--identity-token="+token, targetImageName).Run()).To(Succeed())
 		})
 	})
 
 	Describe("cosign verify", func() {
 		It("should verify the signature", func() {
-			Expect(cosign.Command(testsupport.TestContext, "verify", "--rekor-url="+api.Values.GetString(api.RekorURL), "--certificate-identity-regexp", ".*@redhat", "--certificate-oidc-issuer-regexp", ".*keycloak.*", targetImageName).Run()).To(Succeed())
+			Expect(cosign.Command(testsupport.TestContext, "verify", "--rekor-url="+api.GetValueFor(api.RekorURL), "--certificate-identity-regexp", ".*@redhat", "--certificate-oidc-issuer-regexp", ".*keycloak.*", targetImageName).Run()).To(Succeed())
 		})
 	})
 })
