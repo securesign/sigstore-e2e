@@ -43,7 +43,6 @@ var _ = Describe("gitsign test", Ordered, func() {
 	)
 
 	BeforeAll(func() {
-		logrus.Debug("Mandatory configuration:")
 		err = testsupport.CheckApiConfigValues(testsupport.Mandatory, api.GithubToken, api.GithubUsername, api.GithubOwner, api.GithubRepo,
 			api.FulcioURL, api.RekorURL, api.OidcIssuerURL, api.TufURL, api.OidcRealm)
 		if err != nil {

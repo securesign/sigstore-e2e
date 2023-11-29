@@ -21,14 +21,13 @@ const testImage string = "alpine:latest"
 var _ = Describe("Cosign test", Ordered, func() {
 
 	var (
-		err    error
-		cli    *client.Client
-		cosign *clients.Cosign
+		err       error
+		dockerCli *client.Client
+		cosign    *clients.Cosign
 	)
 	targetImageName := "ttl.sh/" + uuid.New().String() + ":5m"
 
 	BeforeAll(func() {
-		logrus.Debug("Mandatory configuration:")
 		err = testsupport.CheckApiConfigValues(testsupport.Mandatory, api.FulcioURL, api.RekorURL, api.TufURL, api.OidcIssuerURL, api.OidcRealm)
 		if err != nil {
 			Skip("Skip this test - " + err.Error())
@@ -46,19 +45,19 @@ var _ = Describe("Cosign test", Ordered, func() {
 			}
 		})
 
-		cli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		dockerCli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 		Expect(err).ToNot(HaveOccurred())
 
 		var pull io.ReadCloser
-		pull, err = cli.ImagePull(testsupport.TestContext, testImage, types.ImagePullOptions{})
+		pull, err = dockerCli.ImagePull(testsupport.TestContext, testImage, types.ImagePullOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		_, err = io.Copy(os.Stdout, pull)
 		Expect(err).ToNot(HaveOccurred())
 		defer pull.Close()
 
-		Expect(cli.ImageTag(testsupport.TestContext, testImage, targetImageName)).To(Succeed())
+		Expect(dockerCli.ImageTag(testsupport.TestContext, testImage, targetImageName)).To(Succeed())
 		var push io.ReadCloser
-		push, err = cli.ImagePush(testsupport.TestContext, targetImageName, types.ImagePushOptions{RegistryAuth: types.RegistryAuthFromSpec})
+		push, err = dockerCli.ImagePush(testsupport.TestContext, targetImageName, types.ImagePushOptions{RegistryAuth: types.RegistryAuthFromSpec})
 		Expect(err).ToNot(HaveOccurred())
 		_, err = io.Copy(os.Stdout, push)
 		Expect(err).ToNot(HaveOccurred())

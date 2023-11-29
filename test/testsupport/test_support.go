@@ -142,6 +142,11 @@ func GetOIDCToken(ctx context.Context, issuerURL string, userName string, passwo
 func CheckApiConfigValues(failOnMissing bool, keys ...string) error {
 	mandatoryMissing := false
 	errorMessage := "Missing configuration for"
+	if failOnMissing {
+		logrus.Info("Mandatory configuration:")
+	} else {
+		logrus.Info("Optional configuration:")
+	}
 	for _, key := range keys {
 		value := api.GetValueFor(key)
 		if value == "" && failOnMissing {

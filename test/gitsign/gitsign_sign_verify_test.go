@@ -26,7 +26,6 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		err    error
 	)
 	BeforeAll(func() {
-		logrus.Debug("Mandatory configuration:")
 		err = testsupport.CheckApiConfigValues(testsupport.Mandatory, api.FulcioURL, api.RekorURL, api.OidcIssuerURL, api.TufURL)
 		if err != nil {
 			Skip("Skip this test - " + err.Error())
