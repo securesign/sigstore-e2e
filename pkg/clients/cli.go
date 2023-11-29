@@ -3,25 +3,25 @@ package clients
 import (
 	"context"
 	"errors"
-	"github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
 	"runtime"
 	"sigstore-e2e-test/pkg/kubernetes"
 	"sigstore-e2e-test/pkg/support"
+
+	"github.com/sirupsen/logrus"
 )
 
 type cli struct {
-	ctx       context.Context
 	Name      string
 	pathToCLI string
 	setup     SetupStrategy
 }
 
-type SetupStrategy func(*cli) (string, error)
+type SetupStrategy func(context.Context, *cli) (string, error)
 
-func (c *cli) Command(args ...string) *exec.Cmd {
-	cmd := exec.CommandContext(c.ctx, c.pathToCLI, args...)
+func (c *cli) Command(ctx context.Context, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, c.pathToCLI, args...) // #nosec G204 - we don't expect the code to be running on PROD ENV
 
 	cmd.Stdout = logrus.NewEntry(logrus.StandardLogger()).WithField("app", c.Name).WriterLevel(logrus.InfoLevel)
 	cmd.Stderr = logrus.NewEntry(logrus.StandardLogger()).WithField("app", c.Name).WriterLevel(logrus.ErrorLevel)
@@ -29,18 +29,18 @@ func (c *cli) Command(args ...string) *exec.Cmd {
 	return cmd
 }
 
-func (c *cli) Setup() error {
+func (c *cli) Setup(ctx context.Context) error {
 	var err error
-	c.pathToCLI, err = c.setup(c)
+	c.pathToCLI, err = c.setup(ctx, c)
 	return err
 }
 
-func (c *cli) Destroy() error {
+func (c *cli) Destroy(_ context.Context) error {
 	return nil
 }
 
 func BuildFromGit(url string, branch string) SetupStrategy {
-	return func(c *cli) (string, error) {
+	return func(ctx context.Context, c *cli) (string, error) {
 		dir, _, err := support.GitClone(url, branch)
 		if err != nil {
 			return "", err
@@ -52,9 +52,9 @@ func BuildFromGit(url string, branch string) SetupStrategy {
 }
 
 func DownloadFromOpenshift(consoleCliDownloadName string) SetupStrategy {
-	return func(c *cli) (string, error) {
+	return func(ctx context.Context, c *cli) (string, error) {
 		// Get http link
-		link, err := kubernetes.ConsoleCLIDownload(c.ctx, consoleCliDownloadName, runtime.GOOS)
+		link, err := kubernetes.ConsoleCLIDownload(ctx, consoleCliDownloadName, runtime.GOOS)
 		if err != nil {
 			return "", err
 		}
@@ -66,13 +66,13 @@ func DownloadFromOpenshift(consoleCliDownloadName string) SetupStrategy {
 
 		logrus.Info("Downloading ", consoleCliDownloadName, " from ", link)
 		fileName := tmp + string(os.PathSeparator) + consoleCliDownloadName
-		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 711)
+		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711)
 		if err != nil {
 			return "", err
 		}
 		defer file.Close()
 
-		if err = support.DownloadAndUnzip(link, file); err != nil {
+		if err = support.DownloadAndUnzip(ctx, link, file); err != nil {
 			return "", err
 		}
 
@@ -82,14 +82,14 @@ func DownloadFromOpenshift(consoleCliDownloadName string) SetupStrategy {
 }
 
 func LocalBinary() SetupStrategy {
-	return func(c *cli) (string, error) {
+	return func(ctx context.Context, c *cli) (string, error) {
 		return exec.LookPath(c.Name)
 	}
 
 }
 
 func ExtractFromContainer(image string) SetupStrategy {
-	return func(c *cli) (string, error) {
-		return "", errors.New("Not implemented!")
+	return func(ctx context.Context, c *cli) (string, error) {
+		return "", errors.New("not implemented")
 	}
 }

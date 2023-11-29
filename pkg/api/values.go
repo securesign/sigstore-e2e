@@ -8,7 +8,7 @@ const (
 	TufURL        = "TUF_URL"
 	OidcIssuerURL = "OIDC_ISSUER_URL"
 	OidcRealm     = "KEYCLOAK_REALM"
-	KeycloakUrl   = "KEYCLOAK_URL"
+	KeycloakURL   = "KEYCLOAK_URL"
 )
 
 var Values *viper.Viper

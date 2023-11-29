@@ -2,17 +2,17 @@ package operator
 
 import (
 	"context"
+	"sigstore-e2e-test/pkg/kubernetes"
+	"time"
+
 	olmV1 "github.com/operator-framework/api/pkg/operators/v1"
 	olmV1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	controller "sigs.k8s.io/controller-runtime/pkg/client"
-	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigstore-e2e-test/pkg/kubernetes"
-	"time"
 )
 
 type Operator struct {
@@ -44,12 +44,12 @@ func InstallFromOperatorHub(client kubernetes.Client, ctx context.Context, opera
 		logrus.Debug("installing as a cluster-wide operator")
 	} else {
 		ogs := &olmV1.OperatorGroupList{}
-		if err := client.List(ctx, ogs, ctrl.InNamespace(operator.TargetNamespace)); err != nil {
+		if err := client.List(ctx, ogs, controller.InNamespace(operator.TargetNamespace)); err != nil {
 			return err
 		}
 		if len(ogs.Items) == 0 {
 			operatorGroup := olmV1.OperatorGroup{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: operator.SubscriptionName,
 					Namespace:    operator.TargetNamespace,
 				},
@@ -68,7 +68,7 @@ func InstallFromOperatorHub(client kubernetes.Client, ctx context.Context, opera
 	if err != nil {
 		return err
 	}
-	return wait.PollUntilContextTimeout(ctx, 10*time.Second, 10*time.Minute, true, func(ctx context.Context) (done bool, err error) {
+	return wait.PollUntilContextTimeout(ctx, 10*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
 		csv, err := GetInstalledClusterServiceVersion(client, ctx, operator)
 		if err != nil {
 			if errors.IsNotFound(err) {

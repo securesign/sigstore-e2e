@@ -2,8 +2,9 @@ package kubernetes
 
 import (
 	"context"
-	consoleV1 "github.com/openshift/api/console/v1"
 	"regexp"
+
+	consoleV1 "github.com/openshift/api/console/v1"
 	controller "sigs.k8s.io/controller-runtime/pkg/client"
 )
 

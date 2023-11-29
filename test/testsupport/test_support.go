@@ -1,18 +1,9 @@
-package testSupport
+package testsupport
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	configv1 "github.com/openshift/api/config/v1"
-	consoleCli "github.com/openshift/api/console/v1"
-	projectv1 "github.com/openshift/api/project/v1"
-	routev1 "github.com/openshift/api/route/v1"
-	olmV1 "github.com/operator-framework/api/pkg/operators/v1"
-	olmV1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
-	"github.com/sirupsen/logrus"
-	v1beta12 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
-	tektonTriggers "github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
 	"io"
 	"net/http"
 	"net/url"
@@ -22,6 +13,16 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	configv1 "github.com/openshift/api/config/v1"
+	consoleCli "github.com/openshift/api/console/v1"
+	projectv1 "github.com/openshift/api/project/v1"
+	routev1 "github.com/openshift/api/route/v1"
+	olmV1 "github.com/operator-framework/api/pkg/operators/v1"
+	olmV1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	"github.com/sirupsen/logrus"
+	v1beta12 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	tektonTriggers "github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
 )
 
 var (
@@ -41,14 +42,14 @@ func init() {
 		panic(err)
 	}
 
-	olmV1alpha1.AddToScheme(kubernetes.K8sClient.GetScheme())
-	olmV1.AddToScheme(kubernetes.K8sClient.GetScheme())
-	projectv1.AddToScheme(kubernetes.K8sClient.GetScheme())
-	routev1.AddToScheme(kubernetes.K8sClient.GetScheme())
-	tektonTriggers.AddToScheme(kubernetes.K8sClient.GetScheme())
-	configv1.AddToScheme(kubernetes.K8sClient.GetScheme())
-	v1beta12.AddToScheme(kubernetes.K8sClient.GetScheme())
-	consoleCli.AddToScheme(kubernetes.K8sClient.GetScheme())
+	_ = olmV1alpha1.AddToScheme(kubernetes.K8sClient.GetScheme())
+	_ = olmV1.AddToScheme(kubernetes.K8sClient.GetScheme())
+	_ = projectv1.AddToScheme(kubernetes.K8sClient.GetScheme())
+	_ = routev1.AddToScheme(kubernetes.K8sClient.GetScheme())
+	_ = tektonTriggers.AddToScheme(kubernetes.K8sClient.GetScheme())
+	_ = configv1.AddToScheme(kubernetes.K8sClient.GetScheme())
+	_ = v1beta12.AddToScheme(kubernetes.K8sClient.GetScheme())
+	_ = consoleCli.AddToScheme(kubernetes.K8sClient.GetScheme())
 
 	logrus.SetFormatter(&logrus.TextFormatter{
 		SortingFunc: func(s []string) {
@@ -62,9 +63,7 @@ func init() {
 				return
 			}
 
-			b := s[l-1]
-			s[l-1] = s[i]
-			s[i] = b
+			s[l-1], s[i] = s[i], s[l-1]
 		},
 		FieldMap: logrus.FieldMap{
 			logrus.FieldKeyTime:  "t",
@@ -77,7 +76,7 @@ func init() {
 
 func InstallPrerequisites(prerequisite ...api.TestPrerequisite) error {
 	for _, p := range prerequisite {
-		err := p.Setup()
+		err := p.Setup(TestContext)
 		if err != nil {
 			return err
 		}
@@ -89,20 +88,20 @@ func InstallPrerequisites(prerequisite ...api.TestPrerequisite) error {
 func DestroyPrerequisites() error {
 	var errors []error
 	for i := len(installedStack) - 1; i >= 0; i-- {
-		err := installedStack[i].Destroy()
+		err := installedStack[i].Destroy(TestContext)
 		if err != nil {
 			logrus.Warn(err)
 			errors = append(errors, err)
 		}
 	}
 	if len(errors) != 0 {
-		return fmt.Errorf("can't destroy all prerequisities %s", errors)
+		return fmt.Errorf("can't destroy all prerequisites %s", errors)
 	}
 	return nil
 }
 
-func GetOIDCToken(issuerUrl string, userName string, password string, realm string) (string, error) {
-	urlString := issuerUrl + "/protocol/openid-connect/token"
+func GetOIDCToken(ctx context.Context, issuerURL string, userName string, password string, realm string) (string, error) {
+	urlString := issuerURL + "/protocol/openid-connect/token"
 
 	client := &http.Client{}
 	data := url.Values{}
@@ -112,7 +111,7 @@ func GetOIDCToken(issuerUrl string, userName string, password string, realm stri
 	data.Set("client_id", realm)
 	data.Set("grant_type", "password")
 
-	r, _ := http.NewRequest(http.MethodPost, urlString, strings.NewReader(data.Encode())) // URL-encoded payload
+	r, _ := http.NewRequestWithContext(ctx, http.MethodPost, urlString, strings.NewReader(data.Encode())) // URL-encoded payload
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	r.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
 
