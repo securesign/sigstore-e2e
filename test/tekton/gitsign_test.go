@@ -43,13 +43,8 @@ var _ = Describe("gitsign test", Ordered, func() {
 	)
 
 	BeforeAll(func() {
-<<<<<<< HEAD
 		logrus.Debug("Mandatory configuration:")
 		err = testsupport.CheckApiConfigValues(testsupport.Mandatory, api.GithubToken, api.GithubUsername, api.GithubOwner, api.GithubRepo,
-=======
-		logrus.Debug("Mandatory configuration")
-		err = testSupport.CheckApiConfigValues(testSupport.Mandatory, api.GithubToken, api.GithubUsername, api.GithubOwner, api.GithubRepo,
->>>>>>> f46b339 (Use logging instead of printing to console)
 			api.FulcioURL, api.RekorURL, api.OidcIssuerURL, api.TufURL, api.OidcRealm)
 		if err != nil {
 			Skip("Skip this test - " + err.Error())

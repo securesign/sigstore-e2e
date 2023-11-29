@@ -4,7 +4,11 @@ import (
 	"os"
 	"sigstore-e2e-test/pkg/api"
 	"sigstore-e2e-test/pkg/clients"
+<<<<<<< HEAD
 	"sigstore-e2e-test/test/testsupport"
+=======
+	"sigstore-e2e-test/test/testSupport"
+>>>>>>> 2d9a7af (Check mandatory configuration)
 	"time"
 
 	"github.com/go-git/go-git/v5"
