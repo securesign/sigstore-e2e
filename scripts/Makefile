@@ -27,6 +27,6 @@ install-tekton:
 	@oc wait --for=condition=ready pod -l app=openshift-pipelines-operator -n openshift-operators --timeout 1m
 
 test:
-	source ./tas-env-variables.sh && go test -v ./test/...
+	source ./tas-env-variables.sh && go test -v ./test/... --ginkgo.v
 
 .PHONY: install-tas install_tekton test all cleanup
