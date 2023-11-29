@@ -2,6 +2,8 @@ package kubernetes
 
 import (
 	"context"
+	"os"
+
 	projectv1 "github.com/openshift/api/project/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,14 +13,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"os"
 	controller "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 var K8sClient Client
 
-// Client is an abstraction for a k8s client
+// Client is an abstraction for a k8s client.
 type Client interface {
 	controller.Client
 	kubernetes.Interface
@@ -46,7 +47,7 @@ func (c *defaultClient) GetConfig() *rest.Config {
 	return c.config
 }
 
-// NewClient creates a new k8s client that can be used from outside or in the cluster
+// NewClient creates a new k8s client that can be used from outside or in the cluster.
 func NewClient() (Client, error) {
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()

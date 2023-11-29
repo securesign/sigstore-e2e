@@ -3,26 +3,26 @@ package clients
 import (
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/sirupsen/logrus"
 )
 
 type Gitsign struct {
 	*cli
 }
 
-func NewGitsign(ctx context.Context) *Gitsign {
+func NewGitsign() *Gitsign {
 	return &Gitsign{
 		&cli{
 			Name:  "gitsign",
-			ctx:   ctx,
 			setup: DownloadFromOpenshift("gitsign"),
 		}}
 }
 
-func (c *Gitsign) GitWithGitSign(workdir string, signToken string, args ...string) error {
-	cmd := exec.CommandContext(c.ctx, "git", args...)
+func (c *Gitsign) GitWithGitSign(ctx context.Context, workdir string, signToken string, args ...string) error {
+	cmd := exec.CommandContext(ctx, "git", args...)
 	gitPath, err := exec.LookPath("git")
 	if err != nil {
 		return err

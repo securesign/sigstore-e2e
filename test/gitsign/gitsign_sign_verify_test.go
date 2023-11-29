@@ -1,21 +1,23 @@
 package gitsign
 
 import (
+	"os"
+	"sigstore-e2e-test/pkg/api"
+	"sigstore-e2e-test/pkg/clients"
+	"sigstore-e2e-test/test/testsupport"
+	"time"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"os"
-	"sigstore-e2e-test/pkg/api"
-	"sigstore-e2e-test/pkg/clients"
-	"sigstore-e2e-test/test/testSupport"
-	"time"
+	"github.com/sirupsen/logrus"
 )
 
 var _ = Describe("Signing and verifying commits by using Gitsign from the command-line interface", Ordered, func() {
-	var gitsign = clients.NewGitsign(testSupport.TestContext)
-	var cosign = clients.NewCosign(testSupport.TestContext)
+	var gitsign = clients.NewGitsign()
+	var cosign = clients.NewCosign()
 
 	var (
 		dir    string
@@ -24,20 +26,24 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		err    error
 	)
 	BeforeAll(func() {
-		Expect(testSupport.InstallPrerequisites(
+		Expect(testsupport.InstallPrerequisites(
 			gitsign,
 			cosign,
 		)).To(Succeed())
 
-		DeferCleanup(func() { testSupport.DestroyPrerequisites() })
+		DeferCleanup(func() {
+			if err := testsupport.DestroyPrerequisites(); err != nil {
+				logrus.Warn("Env was not cleaned-up" + err.Error())
+			}
+		})
 
 		// initialize local git repository
 		dir, err = os.MkdirTemp("", "repository")
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		repo, err = git.PlainInit(dir, false)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		config, err = repo.Config()
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	Context("With configured git", func() {
@@ -64,32 +70,32 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 	Describe("Make a commit to the local repository", func() {
 		It("creates a new file and stage it", func() {
 			testFileName := dir + "/testFile.txt"
-			Expect(os.WriteFile(testFileName, []byte(uuid.New().String()), 0644)).To(Succeed())
+			Expect(os.WriteFile(testFileName, []byte(uuid.New().String()), 0600)).To(Succeed())
 			worktree, err := repo.Worktree()
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			_, err = worktree.Add(".")
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("gets ID token and makes commit", func() {
-			token, err := testSupport.GetOIDCToken(api.Values.GetString(api.OidcIssuerURL),
+			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.Values.GetString(api.OidcIssuerURL),
 				"jdoe@redhat.com",
 				"secure",
 				api.Values.GetString(api.OidcRealm))
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(token).To(Not(BeEmpty()))
-			Expect(gitsign.GitWithGitSign(dir, token, "commit", "-S", "-m", "CI commit "+time.Now().String())).To(Succeed())
+			Expect(gitsign.GitWithGitSign(testsupport.TestContext, dir, token, "commit", "-S", "-m", "CI commit "+time.Now().String())).To(Succeed())
 		})
 
 		It("checks that commit has PGP signature", func() {
 			ref, err := repo.Head()
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			logEntry, err := repo.Log(&git.LogOptions{
 				From: ref.Hash(),
 			})
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			commit, err := logEntry.Next()
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(commit.PGPSignature).To(Not(BeNil()))
 		})
 	})
@@ -97,7 +103,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 	Describe("Verify the commit", func() {
 		Context("With initialized Fulcio CA", func() {
 			It("initialize cosign", func() {
-				Expect(cosign.Command("initialize",
+				Expect(cosign.Command(testsupport.TestContext, "initialize",
 					"--mirror="+api.Values.GetString(api.TufURL),
 					"--root="+api.Values.GetString(api.TufURL)+"/root.json").Run()).To(Succeed())
 			})
@@ -105,7 +111,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 
 		When("commiter is authorized", func() {
 			It("should verify HEAD signature by gitsign", func() {
-				cmd := gitsign.Command("verify",
+				cmd := gitsign.Command(testsupport.TestContext, "verify",
 					"--certificate-identity", "jdoe@redhat.com",
 					"--certificate-oidc-issuer", api.Values.GetString(api.OidcIssuerURL),
 					"HEAD")

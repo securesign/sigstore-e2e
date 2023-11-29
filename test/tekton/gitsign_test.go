@@ -2,6 +2,16 @@ package tekton
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sigstore-e2e-test/pkg/api"
+	"sigstore-e2e-test/pkg/clients"
+	"sigstore-e2e-test/pkg/kubernetes"
+	"sigstore-e2e-test/pkg/support"
+	"sigstore-e2e-test/test/testsupport"
+	"time"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	gitAuth "github.com/go-git/go-git/v5/plumbing/transport/http"
@@ -10,20 +20,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "github.com/openshift/api/route/v1"
+	"github.com/sirupsen/logrus"
 	v1beta12 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
 	v12 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"os"
-	"path/filepath"
-	"runtime"
 	controller "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigstore-e2e-test/pkg/api"
-	"sigstore-e2e-test/pkg/clients"
-	"sigstore-e2e-test/pkg/kubernetes"
-	"sigstore-e2e-test/pkg/support"
-	"sigstore-e2e-test/test/testSupport"
-	"time"
 )
 
 var (
@@ -34,29 +36,33 @@ var (
 )
 
 var _ = Describe("gitsign test", Ordered, func() {
-	var webhookUrl string
+	var webhookURL string
 	githubClient := github.NewClient(nil).WithAuthToken(GithubToken)
 	var webhook *github.Hook
 
-	var gitsign = clients.NewGitsign(testSupport.TestContext)
-	var testProject = kubernetes.NewTestProject(testSupport.TestContext, "", false)
+	var gitsign = clients.NewGitsign()
+	var testProject = kubernetes.NewTestProject("", false)
 
 	BeforeAll(func() {
 		if GithubToken == "" {
 			Skip("This test require TEST_GITHUB_TOKEN provided with GitHub access token")
 		}
 
-		Expect(testSupport.InstallPrerequisites(
+		Expect(testsupport.InstallPrerequisites(
 			gitsign,
 			testProject,
 		)).To(Succeed())
 
-		DeferCleanup(func() { testSupport.DestroyPrerequisites() })
+		DeferCleanup(func() {
+			if err := testsupport.DestroyPrerequisites(); err != nil {
+				logrus.Warn("Env was not cleaned-up" + err.Error())
+			}
+		})
 	})
 
 	AfterAll(func() {
 		if webhook != nil {
-			_, _ = githubClient.Repositories.DeleteHook(testSupport.TestContext, GithubOwner, GithubRepo, *webhook.ID)
+			_, _ = githubClient.Repositories.DeleteHook(testsupport.TestContext, GithubOwner, GithubRepo, *webhook.ID)
 		}
 	})
 
@@ -65,31 +71,31 @@ var _ = Describe("gitsign test", Ordered, func() {
 			// use file definition for large tekton resources
 			_, b, _, _ := runtime.Caller(0)
 			path := filepath.Dir(b) + "/resources"
-			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/verify-commit-signature-task.yaml")).To(Succeed())
-			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/verify-source-code-pipeline.yaml")).To(Succeed())
-			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/verify-source-code-triggertemplate.yaml")).To(Succeed())
-			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/verify-source-el.yaml")).To(Succeed())
-			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/verify-source-el-route.yaml")).To(Succeed())
-			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/webhook-secret-securesign-pipelines-demo.yaml")).To(Succeed())
-			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/github-push-triggerbinding.yaml")).To(Succeed())
-			Expect(kubernetes.K8sClient.CreateResource(testSupport.TestContext, testProject.Namespace, path+"/verify-source-code-triggerbinding.yaml")).To(Succeed())
-			Expect(kubernetes.K8sClient.Create(testSupport.TestContext, createTriggerBindingResource(testProject.Namespace))).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testsupport.TestContext, testProject.Namespace, path+"/verify-commit-signature-task.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testsupport.TestContext, testProject.Namespace, path+"/verify-source-code-pipeline.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testsupport.TestContext, testProject.Namespace, path+"/verify-source-code-triggertemplate.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testsupport.TestContext, testProject.Namespace, path+"/verify-source-el.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testsupport.TestContext, testProject.Namespace, path+"/verify-source-el-route.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testsupport.TestContext, testProject.Namespace, path+"/webhook-secret-securesign-pipelines-demo.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testsupport.TestContext, testProject.Namespace, path+"/github-push-triggerbinding.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.CreateResource(testsupport.TestContext, testProject.Namespace, path+"/verify-source-code-triggerbinding.yaml")).To(Succeed())
+			Expect(kubernetes.K8sClient.Create(testsupport.TestContext, createTriggerBindingResource(testProject.Namespace))).To(Succeed())
 
 			route := &v1.Route{}
 			Eventually(func() v1.Route {
-				kubernetes.K8sClient.Get(testSupport.TestContext, controller.ObjectKey{
+				_ = kubernetes.K8sClient.Get(testsupport.TestContext, controller.ObjectKey{
 					Namespace: testProject.Namespace,
 					Name:      "el-verify-source",
 				}, route)
 				return *route
 			}, time.Minute).Should(And(Not(BeNil()), WithTransform(func(r v1.Route) string { return r.Status.Ingress[0].Host }, Not(BeEmpty()))))
-			webhookUrl = route.Status.Ingress[0].Host
+			webhookURL = route.Status.Ingress[0].Host
 
 			Eventually(func() []v12.Pod {
-				pods, _ := kubernetes.K8sClient.CoreV1().Pods(testProject.Namespace).List(testSupport.TestContext, metav1.ListOptions{
+				pods, _ := kubernetes.K8sClient.CoreV1().Pods(testProject.Namespace).List(testsupport.TestContext, metav1.ListOptions{
 					LabelSelector: "eventlistener=verify-source"})
 				return pods.Items
-			}, testSupport.TestTimeoutMedium).Should(And(HaveLen(1), WithTransform(func(pods []v12.Pod) v12.PodPhase { return pods[0].Status.Phase }, Equal(v12.PodRunning))))
+			}, testsupport.TestTimeoutMedium).Should(And(HaveLen(1), WithTransform(func(pods []v12.Pod) v12.PodPhase { return pods[0].Status.Phase }, Equal(v12.PodRunning))))
 		})
 		// sleep a few more seconds for everything to settle down
 		time.Sleep(30 * time.Second)
@@ -98,7 +104,7 @@ var _ = Describe("gitsign test", Ordered, func() {
 	Describe("register GitHub webhook", func() {
 		It("register tekton webhook", func() {
 			hookConfig := make(map[string]interface{})
-			hookConfig["url"] = "https://" + webhookUrl
+			hookConfig["url"] = "https://" + webhookURL
 			hookConfig["content_type"] = "json"
 			hookConfig["secret"] = "secretToken"
 			hookName := "test" + uuid.New().String()
@@ -107,12 +113,12 @@ var _ = Describe("gitsign test", Ordered, func() {
 				response *github.Response
 				err      error
 			)
-			webhook, response, err = githubClient.Repositories.CreateHook(testSupport.TestContext, GithubOwner, GithubRepo, &github.Hook{
+			webhook, response, err = githubClient.Repositories.CreateHook(testsupport.TestContext, GithubOwner, GithubRepo, &github.Hook{
 				Name:   &hookName,
 				Config: hookConfig,
 				Events: []string{"push"},
 			})
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(response.Status).To(Equal("201 Created"))
 		})
 
@@ -133,7 +139,7 @@ var _ = Describe("gitsign test", Ordered, func() {
 
 			It("Add git configuration for gitsign", func() {
 				config, err = repo.Config()
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				config.User.Name = "John Doe"
 				config.User.Email = "jdoe@redhat.com"
 
@@ -150,17 +156,17 @@ var _ = Describe("gitsign test", Ordered, func() {
 
 			It("add and push signed commit", func() {
 				testFileName := dir + "/testFile.txt"
-				Expect(os.WriteFile(testFileName, []byte(uuid.New().String()), 0644)).To(Succeed())
+				Expect(os.WriteFile(testFileName, []byte(uuid.New().String()), 0600)).To(Succeed())
 				worktree, err := repo.Worktree()
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				_, err = worktree.Add(".")
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 
-				token, err := testSupport.GetOIDCToken(api.Values.GetString(api.OidcIssuerURL), "jdoe@redhat.com", "secure", api.Values.GetString(api.OidcRealm))
-				Expect(err).To(BeNil())
+				token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.Values.GetString(api.OidcIssuerURL), "jdoe@redhat.com", "secure", api.Values.GetString(api.OidcRealm))
+				Expect(err).ToNot(HaveOccurred())
 				Expect(token).To(Not(BeEmpty()))
 
-				Expect(gitsign.GitWithGitSign(dir, token, "commit", "-m", "CI commit "+time.Now().String())).To(Succeed())
+				Expect(gitsign.GitWithGitSign(testsupport.TestContext, dir, token, "commit", "-m", "CI commit "+time.Now().String())).To(Succeed())
 
 				Expect(repo.Push(&git.PushOptions{
 					Auth: &gitAuth.BasicAuth{
@@ -169,13 +175,13 @@ var _ = Describe("gitsign test", Ordered, func() {
 					}})).To(Succeed())
 
 				ref, err := repo.Head()
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				logEntry, err := repo.Log(&git.LogOptions{
 					From: ref.Hash(),
 				})
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				commit, err := logEntry.Next()
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(commit.PGPSignature).To(Not(BeNil()))
 			})
 		})
@@ -185,12 +191,12 @@ var _ = Describe("gitsign test", Ordered, func() {
 
 				Eventually(func() []v1beta12.PipelineRun {
 					pipelineRuns := &v1beta12.PipelineRunList{}
-					kubernetes.K8sClient.List(testSupport.TestContext, pipelineRuns,
+					Expect(kubernetes.K8sClient.List(testsupport.TestContext, pipelineRuns,
 						controller.InNamespace(testProject.Namespace),
 						controller.MatchingLabels{"tekton.dev/pipeline": "verify-source-code-pipeline"},
-					)
+					)).ToNot(HaveOccurred())
 					return pipelineRuns.Items
-				}, testSupport.TestTimeoutMedium).Should(And(HaveLen(1), WithTransform(func(list []v1beta12.PipelineRun) bool {
+				}, testsupport.TestTimeoutMedium).Should(And(HaveLen(1), WithTransform(func(list []v1beta12.PipelineRun) bool {
 					return list[0].Status.GetCondition("Succeeded").IsTrue()
 				}, BeTrue())))
 
