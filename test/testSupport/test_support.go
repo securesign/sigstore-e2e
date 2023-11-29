@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"sigstore-e2e-test/pkg/api"
 	"sigstore-e2e-test/pkg/kubernetes"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +49,30 @@ func init() {
 	configv1.AddToScheme(kubernetes.K8sClient.GetScheme())
 	v1beta12.AddToScheme(kubernetes.K8sClient.GetScheme())
 	consoleCli.AddToScheme(kubernetes.K8sClient.GetScheme())
+
+	logrus.SetFormatter(&logrus.TextFormatter{
+		SortingFunc: func(s []string) {
+			l := len(s)
+			if l < 1 {
+				return
+			}
+
+			i := slices.Index(s, "m")
+			if i < 0 {
+				return
+			}
+
+			b := s[l-1]
+			s[l-1] = s[i]
+			s[i] = b
+		},
+		FieldMap: logrus.FieldMap{
+			logrus.FieldKeyTime:  "t",
+			logrus.FieldKeyLevel: "l",
+			logrus.FieldKeyMsg:   "m",
+		},
+		DisableQuote: true,
+	})
 }
 
 func InstallPrerequisites(prerequisite ...api.TestPrerequisite) error {

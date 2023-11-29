@@ -1,4 +1,4 @@
-package gitsign
+package tekton
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestGitSignE2eTest(t *testing.T) {
+func TestGitSignE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Sign commigs with gitsign tool")
 }
