@@ -26,7 +26,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		err    error
 	)
 	BeforeAll(func() {
-		err = testsupport.CheckApiConfigValues(testsupport.Mandatory, api.FulcioURL, api.RekorURL, api.OidcIssuerURL, api.TufURL)
+		err = testsupport.CheckAPIConfigValues(testsupport.Mandatory, api.FulcioURL, api.RekorURL, api.OidcIssuerURL, api.TufURL)
 		if err != nil {
 			Skip("Skip this test - " + err.Error())
 		}

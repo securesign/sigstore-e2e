@@ -9,7 +9,7 @@ const (
 	OidcIssuerURL  = "OIDC_ISSUER_URL"
 	OidcRealm      = "KEYCLOAK_REALM"
 	KeycloakURL    = "KEYCLOAK_URL"
-	GithubToken    = "TEST_GITHUB_TOKEN"
+	GithubToken    = "TEST_GITHUB_TOKEN" // #nosec G101: Potential hardcoded credentials (gosec)
 	GithubUsername = "TEST_GITHUB_USER"
 	GithubOwner    = "TEST_GITHUB_OWNER"
 	GithubRepo     = "TEST_GITHUB_REPO"

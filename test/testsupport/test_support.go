@@ -139,7 +139,7 @@ func GetOIDCToken(ctx context.Context, issuerURL string, userName string, passwo
 	return fmt.Sprintf("%v", jsonOut["access_token"]), nil
 }
 
-func CheckApiConfigValues(failOnMissing bool, keys ...string) error {
+func CheckAPIConfigValues(failOnMissing bool, keys ...string) error {
 	mandatoryMissing := false
 	errorMessage := "Missing configuration for"
 	if failOnMissing {
@@ -170,9 +170,8 @@ func CheckApiConfigValues(failOnMissing bool, keys ...string) error {
 	}
 }
 
-func getHint(apiKey string) (hintPresent bool, hint string) {
-	switch apiKey {
-	case api.GithubToken:
+func getHint(apiKey string) (bool, string) {
+	if apiKey == api.GithubToken {
 		return true, fmt.Sprintf("Authorization token for github client. Export it as environment variable %s.", apiKey)
 	}
 	return false, ""
