@@ -153,13 +153,27 @@ func CheckApiConfigValues(failOnMissing bool, keys ...string) error {
 			mandatoryMissing = true
 			errorMessage += " " + key
 			logrus.Warn(key, "=", value)
+			hintPresent, hint := getHint(key)
+			if hintPresent {
+				logrus.Warn("   Hint: " + hint)
+			}
 		} else {
 			logrus.Info(key, "=", value)
 		}
 	}
 	if mandatoryMissing {
+		logrus.Warn("   Hint: Missing config values should be provided during cluster installation. " +
+			"Export them as environment variables.")
 		return errors.New(errorMessage)
 	} else {
 		return nil
 	}
+}
+
+func getHint(apiKey string) (hintPresent bool, hint string) {
+	switch apiKey {
+	case api.GithubToken:
+		return true, fmt.Sprintf("Authorization token for github client. Export it as environment variable %s.", apiKey)
+	}
+	return false, ""
 }
