@@ -8,12 +8,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"sigstore-e2e-test/pkg/api"
-	"sigstore-e2e-test/pkg/kubernetes"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/securesign/sigstore-e2e/pkg/api"
+	"github.com/securesign/sigstore-e2e/pkg/kubernetes"
 
 	configv1 "github.com/openshift/api/config/v1"
 	consoleCli "github.com/openshift/api/console/v1"

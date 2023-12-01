@@ -3,10 +3,11 @@ package cosign
 import (
 	"io"
 	"os"
-	"sigstore-e2e-test/pkg/api"
-	"sigstore-e2e-test/pkg/clients"
-	"sigstore-e2e-test/test/testsupport"
 	"time"
+
+	"github.com/securesign/sigstore-e2e/pkg/api"
+	"github.com/securesign/sigstore-e2e/pkg/clients"
+	"github.com/securesign/sigstore-e2e/test/testsupport"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"

@@ -2,8 +2,9 @@ package operator
 
 import (
 	"context"
-	"sigstore-e2e-test/pkg/kubernetes"
 	"time"
+
+	"github.com/securesign/sigstore-e2e/pkg/kubernetes"
 
 	olmV1 "github.com/operator-framework/api/pkg/operators/v1"
 	olmV1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
