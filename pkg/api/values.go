@@ -13,6 +13,10 @@ const (
 	GithubUsername = "TEST_GITHUB_USER"
 	GithubOwner    = "TEST_GITHUB_OWNER"
 	GithubRepo     = "TEST_GITHUB_REPO"
+
+	// 'DockerRegistry*' - Login credentials for 'registry.redhat.io'.
+	DockerRegistryUsername = "REGISTRY_USERNAME"
+	DockerRegistryPassword = "REGISTRY_PASSWORD"
 )
 
 var Values *viper.Viper

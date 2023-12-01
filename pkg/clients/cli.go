@@ -2,13 +2,22 @@ package clients
 
 import (
 	"context"
-	"errors"
+	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
-	"sigstore-e2e-test/pkg/kubernetes"
-	"sigstore-e2e-test/pkg/support"
+	"strings"
 
+	"github.com/securesign/sigstore-e2e/pkg/support"
+
+	"github.com/securesign/sigstore-e2e/pkg/kubernetes"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
+	"github.com/google/uuid"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 )
 
@@ -27,6 +36,16 @@ func (c *cli) Command(ctx context.Context, args ...string) *exec.Cmd {
 	cmd.Stderr = logrus.NewEntry(logrus.StandardLogger()).WithField("app", c.Name).WriterLevel(logrus.ErrorLevel)
 
 	return cmd
+}
+
+func (c *cli) CommandOutput(ctx context.Context, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, c.pathToCLI, args...) // #nosec G204 - we don't expect the code to be running on PROD ENV
+	return cmd.Output()
+}
+
+func (c *cli) WithSetupStrategy(strategy SetupStrategy) *cli {
+	c.setup = strategy
+	return c
 }
 
 func (c *cli) Setup(ctx context.Context) error {
@@ -88,8 +107,67 @@ func LocalBinary() SetupStrategy {
 
 }
 
-func ExtractFromContainer(image string) SetupStrategy {
+func ExtractFromContainer(image string, path string) SetupStrategy {
 	return func(ctx context.Context, c *cli) (string, error) {
-		return "", errors.New("not implemented")
+		dockerCli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		if err != nil {
+			return "", err
+		}
+
+		registryAuth, err := support.DockerAuth()
+		if err != nil {
+			return "", err
+		}
+		pull, err := dockerCli.ImagePull(ctx, image, types.ImagePullOptions{RegistryAuth: registryAuth})
+		if err != nil {
+			return "", err
+		}
+		defer pull.Close()
+		out := logrus.NewEntry(logrus.StandardLogger()).WithField("app", "docker").WriterLevel(logrus.DebugLevel)
+		_, _ = io.Copy(out, pull)
+
+		var cont container.ContainerCreateCreatedBody
+		if cont, err = dockerCli.ContainerCreate(ctx, &container.Config{Image: image},
+			nil,
+			nil,
+			&v1.Platform{OS: runtime.GOOS},
+			uuid.New().String()); err != nil {
+			return "", err
+		}
+
+		var tarOut io.ReadCloser
+		if tarOut, _, err = dockerCli.CopyFromContainer(ctx, cont.ID, path); err != nil {
+			return "", err
+		}
+
+		defer tarOut.Close()
+
+		cliName := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+		tmp, err := os.MkdirTemp("", cliName)
+		if err != nil {
+			return "", err
+		}
+		fileName := tmp + string(os.PathSeparator) + cliName
+		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711)
+		if err != nil {
+			return "", err
+		}
+		defer file.Close()
+
+		r, w := io.Pipe()
+		defer r.Close()
+
+		go func() {
+			defer w.Close()
+			if err := support.Untar(tarOut, w); err != nil {
+				panic(err)
+
+			}
+		}()
+
+		if err = support.Gunzip(r, file); err != nil {
+			return "", err
+		}
+		return file.Name(), err
 	}
 }

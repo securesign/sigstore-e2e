@@ -5,12 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sigstore-e2e-test/pkg/api"
-	"sigstore-e2e-test/pkg/clients"
-	"sigstore-e2e-test/pkg/kubernetes"
-	"sigstore-e2e-test/pkg/support"
-	"sigstore-e2e-test/test/testsupport"
 	"time"
+
+	"github.com/securesign/sigstore-e2e/pkg/clients"
+	"github.com/securesign/sigstore-e2e/pkg/kubernetes"
+	"github.com/securesign/sigstore-e2e/pkg/support"
+	"github.com/securesign/sigstore-e2e/test/testsupport"
+
+	"github.com/securesign/sigstore-e2e/pkg/api"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
