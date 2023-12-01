@@ -1,4 +1,4 @@
-module sigstore-e2e-test
+module github.com/securesign/sigstore-e2e
 
 go 1.21
 
