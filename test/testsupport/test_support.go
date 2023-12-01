@@ -3,6 +3,7 @@ package testsupport
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,6 +24,11 @@ import (
 	"github.com/sirupsen/logrus"
 	v1beta12 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	tektonTriggers "github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
+)
+
+const (
+	Mandatory bool = true
+	Optional  bool = false
 )
 
 var (
@@ -131,4 +137,42 @@ func GetOIDCToken(ctx context.Context, issuerURL string, userName string, passwo
 		return "", err
 	}
 	return fmt.Sprintf("%v", jsonOut["access_token"]), nil
+}
+
+func CheckAPIConfigValues(failOnMissing bool, keys ...string) error {
+	mandatoryMissing := false
+	errorMessage := "Missing configuration for"
+	if failOnMissing {
+		logrus.Info("Mandatory configuration:")
+	} else {
+		logrus.Info("Optional configuration:")
+	}
+	for _, key := range keys {
+		value := api.GetValueFor(key)
+		if value == "" && failOnMissing {
+			mandatoryMissing = true
+			errorMessage += " " + key
+			logrus.Warn(key, "=", value)
+			hintPresent, hint := getHint(key)
+			if hintPresent {
+				logrus.Warn("   Hint: " + hint)
+			}
+		} else {
+			logrus.Info(key, "=", value)
+		}
+	}
+	if mandatoryMissing {
+		logrus.Warn("   Hint: Missing config values should be provided during cluster installation. " +
+			"Export them as environment variables.")
+		return errors.New(errorMessage)
+	} else {
+		return nil
+	}
+}
+
+func getHint(apiKey string) (bool, string) {
+	if apiKey == api.GithubToken {
+		return true, fmt.Sprintf("Authorization token for github client. Export it as environment variable %s.", apiKey)
+	}
+	return false, ""
 }

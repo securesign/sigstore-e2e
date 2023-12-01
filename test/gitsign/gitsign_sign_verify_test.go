@@ -26,6 +26,11 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		err    error
 	)
 	BeforeAll(func() {
+		err = testsupport.CheckAPIConfigValues(testsupport.Mandatory, api.FulcioURL, api.RekorURL, api.OidcIssuerURL, api.TufURL)
+		if err != nil {
+			Skip("Skip this test - " + err.Error())
+		}
+
 		Expect(testsupport.InstallPrerequisites(
 			gitsign,
 			cosign,
@@ -59,9 +64,9 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 			config.Raw.AddOption("tag", "", "gpgsign", "true")
 			config.Raw.AddOption("gpg", "x509", "program", "gitsign")
 			config.Raw.AddOption("gpg", "", "format", "x509")
-			config.Raw.AddOption("gitsign", "", "fulcio", api.Values.GetString(api.FulcioURL))
-			config.Raw.AddOption("gitsign", "", "rekor", api.Values.GetString(api.RekorURL))
-			config.Raw.AddOption("gitsign", "", "issuer", api.Values.GetString(api.OidcIssuerURL))
+			config.Raw.AddOption("gitsign", "", "fulcio", api.GetValueFor(api.FulcioURL))
+			config.Raw.AddOption("gitsign", "", "rekor", api.GetValueFor(api.RekorURL))
+			config.Raw.AddOption("gitsign", "", "issuer", api.GetValueFor(api.OidcIssuerURL))
 
 			Expect(repo.SetConfig(config)).To(Succeed())
 		})
@@ -78,10 +83,10 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		})
 
 		It("gets ID token and makes commit", func() {
-			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.Values.GetString(api.OidcIssuerURL),
+			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.GetValueFor(api.OidcIssuerURL),
 				"jdoe@redhat.com",
 				"secure",
-				api.Values.GetString(api.OidcRealm))
+				api.GetValueFor(api.OidcRealm))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(token).To(Not(BeEmpty()))
 			Expect(gitsign.GitWithGitSign(testsupport.TestContext, dir, token, "commit", "-S", "-m", "CI commit "+time.Now().String())).To(Succeed())
@@ -104,8 +109,8 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		Context("With initialized Fulcio CA", func() {
 			It("initialize cosign", func() {
 				Expect(cosign.Command(testsupport.TestContext, "initialize",
-					"--mirror="+api.Values.GetString(api.TufURL),
-					"--root="+api.Values.GetString(api.TufURL)+"/root.json").Run()).To(Succeed())
+					"--mirror="+api.GetValueFor(api.TufURL),
+					"--root="+api.GetValueFor(api.TufURL)+"/root.json").Run()).To(Succeed())
 			})
 		})
 
@@ -113,7 +118,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 			It("should verify HEAD signature by gitsign", func() {
 				cmd := gitsign.Command(testsupport.TestContext, "verify",
 					"--certificate-identity", "jdoe@redhat.com",
-					"--certificate-oidc-issuer", api.Values.GetString(api.OidcIssuerURL),
+					"--certificate-oidc-issuer", api.GetValueFor(api.OidcIssuerURL),
 					"HEAD")
 				cmd.Dir = dir
 				// gitsign requires to find git in PATH

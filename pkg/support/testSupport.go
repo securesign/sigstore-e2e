@@ -38,13 +38,6 @@ func GitCloneWithAuth(url string, auth transport.AuthMethod) (string, *git.Repos
 	return dir, repo, err
 }
 
-func GetEnvOrDefault(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
-}
-
 func DownloadAndUnzip(ctx context.Context, link string, writer io.Writer) error {
 	pr, pw := io.Pipe()
 
