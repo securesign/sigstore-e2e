@@ -23,6 +23,17 @@ To automatically install all prerequisites and execute tests perform following c
 ```
 make all
 ```
+
+If the cluster is already prepared and anly the tests needs to be started, use
+```
+make test
+```
+or, with setting up also the the file with environment variables (`tas-env-variables.sh`)
+```
+make get-env test
+```
+File with environment variables needs to be genereated only once, until the cluster or its components paths are not changed.
+
 #### Ginkgo
 The test suite uses [ginkgo framework](https://onsi.github.io/ginkgo/). You can run the test suite manually by either `go test` command or using the [ginkgo](https://onsi.github.io/ginkgo/#installing-ginkgo) client.
 If you decide to do so, you need to set ENV variables defined in [values.go](pkg/api/values.go).
