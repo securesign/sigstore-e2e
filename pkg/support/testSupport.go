@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -100,7 +101,7 @@ func Gunzip(reader io.Reader, writer io.Writer) error {
 	return err
 }
 
-func Untar(reader io.Reader, writer io.Writer) error {
+func UntarFile(reader io.Reader, writer io.Writer) error {
 	tr := tar.NewReader(reader)
 	var hdr *tar.Header
 	var err error
@@ -110,4 +111,70 @@ func Untar(reader io.Reader, writer io.Writer) error {
 	_, err = io.Copy(writer, tr) // #nosec G110 - PROD CLIs are not decompression bomb
 	logrus.Debug("untar file from docker image " + hdr.Name)
 	return err
+}
+
+func UntarArchive(dst string, r io.Reader) error {
+
+	gzr, err := gzip.NewReader(r)
+	if err != nil {
+		return err
+	}
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+
+	for {
+		header, err := tr.Next()
+
+		switch {
+
+		// if no more files are found return
+		case err == io.EOF:
+			return nil
+
+		// return any other error
+		case err != nil:
+			return err
+
+		// if the header is nil, just skip it (not sure how this happens)
+		case header == nil:
+			continue
+		}
+
+		// the target location where the dir/file should be created
+		target := filepath.Join(dst, header.Name) // #nosec G305 - We don't expect file traversal attack on test ENV
+
+		// check the file type
+		switch header.Typeflag {
+
+		// if its a dir and it doesn't exist create it
+		case tar.TypeDir:
+			if _, err := os.Stat(target); err != nil {
+				if err := os.MkdirAll(target, 0755); err != nil {
+					return err
+				}
+			}
+
+		// if it's a file create it
+		case tar.TypeReg:
+			if _, err := os.Stat(filepath.Dir(target)); err != nil {
+				if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+					return err
+				}
+			}
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+
+			// copy over contents
+			if _, err := io.Copy(f, tr); err != nil {
+				return err
+			} // #nosec G110 - Don't expect decompression bomb
+
+			// manually close here after each file operation; defering would cause each file close
+			// to wait until all operations have completed.
+			f.Close()
+		}
+	}
 }
