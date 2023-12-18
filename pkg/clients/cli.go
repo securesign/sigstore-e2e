@@ -159,7 +159,7 @@ func ExtractFromContainer(image string, path string) SetupStrategy {
 
 		go func() {
 			defer w.Close()
-			if err := support.Untar(tarOut, w); err != nil {
+			if err := support.UntarFile(tarOut, w); err != nil {
 				panic(err)
 
 			}
