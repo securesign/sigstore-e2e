@@ -9,7 +9,7 @@ gen-env: get-tas
 
 cleanup:
 	helm uninstall trusted-artifact-signer -n trusted-artifact-signer || true
-	$(shell r=$(REPO_URL); oc delete -k "$${r%.*}/keycloak/resources/base?ref=$(BRANCH)" || true)
+	r=$(REPO_URL); oc delete -k "$${r%.*}/keycloak/resources/base?ref=$(BRANCH)" || true
 	oc delete project fulcio-system rekor-system keycloak-system || true
 
 get-tas:
