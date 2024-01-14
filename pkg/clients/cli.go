@@ -56,7 +56,7 @@ func (c *cli) Setup(ctx context.Context) error {
 		if err == nil {
 			if c.versionCommand != "" {
 				logrus.Info("Done. Using '", c.pathToCLI, "' with version:")
-				c.Command(ctx, c.versionCommand).Run()
+				_ = c.Command(ctx, c.versionCommand).Run()
 			}
 			break
 		}
