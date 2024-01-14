@@ -22,9 +22,10 @@ import (
 )
 
 type cli struct {
-	Name      string
-	pathToCLI string
-	setup     SetupStrategy
+	Name            string
+	pathToCLI       string
+	setupStrategies []SetupStrategy
+	versionCommand  string
 }
 
 type SetupStrategy func(context.Context, *cli) (string, error)
@@ -43,14 +44,24 @@ func (c *cli) CommandOutput(ctx context.Context, args ...string) ([]byte, error)
 	return cmd.Output()
 }
 
-func (c *cli) WithSetupStrategy(strategy SetupStrategy) *cli {
-	c.setup = strategy
+func (c *cli) WithSetupStrategies(strategies []SetupStrategy) *cli {
+	c.setupStrategies = strategies
 	return c
 }
 
 func (c *cli) Setup(ctx context.Context) error {
 	var err error
-	c.pathToCLI, err = c.setup(ctx, c)
+	for _, setupStrategy := range c.setupStrategies {
+		c.pathToCLI, err = setupStrategy(ctx, c)
+		if err == nil {
+			if c.versionCommand != "" {
+				logrus.Info("Done. Using '", c.pathToCLI, "' with version:")
+				c.Command(ctx, c.versionCommand).Run()
+			}
+			break
+		}
+		logrus.Warn("Failed due to\n   ", err)
+	}
 	return err
 }
 
@@ -58,33 +69,39 @@ func (c *cli) Destroy(_ context.Context) error {
 	return nil
 }
 
-func BuildFromGit(url string, branch string) SetupStrategy {
+func BuildFromGit(url string, branch string, buildingDirectory string) SetupStrategy {
 	return func(ctx context.Context, c *cli) (string, error) {
+		logrus.Info("Building '", c.Name, "' from git: ", url, ", branch ", branch)
 		dir, _, err := support.GitClone(url, branch)
 		if err != nil {
 			return "", err
 		}
-		err = exec.Command("go", "build", "-C", dir, "-o", c.Name, "./cmd/"+c.Name).Run()
+		cmd := exec.Command("go", "build", "-C", dir, "-o", c.Name, buildingDirectory)
+		cmd.Stdout = logrus.NewEntry(logrus.StandardLogger()).WithField("app", c.Name).WriterLevel(logrus.InfoLevel)
+		cmd.Stderr = logrus.NewEntry(logrus.StandardLogger()).WithField("app", c.Name).WriterLevel(logrus.ErrorLevel)
+		err = cmd.Run()
+
 		return dir + "/" + c.Name, err
 	}
 
 }
 
-func DownloadFromOpenshift(consoleCliDownloadName string) SetupStrategy {
+func DownloadFromOpenshift() SetupStrategy {
 	return func(ctx context.Context, c *cli) (string, error) {
+		logrus.Info("Getting binary '", c.Name, "' from Openshift")
 		// Get http link
-		link, err := kubernetes.ConsoleCLIDownload(ctx, consoleCliDownloadName, runtime.GOOS)
+		link, err := kubernetes.ConsoleCLIDownload(ctx, c.Name, runtime.GOOS)
 		if err != nil {
 			return "", err
 		}
 
-		tmp, err := os.MkdirTemp("", consoleCliDownloadName)
+		tmp, err := os.MkdirTemp("", c.Name)
 		if err != nil {
 			return "", err
 		}
 
-		logrus.Info("Downloading ", consoleCliDownloadName, " from ", link)
-		fileName := tmp + string(os.PathSeparator) + consoleCliDownloadName
+		logrus.Info("Downloading ", c.Name, " from ", link)
+		fileName := tmp + string(os.PathSeparator) + c.Name
 		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711)
 		if err != nil {
 			return "", err
@@ -102,6 +119,7 @@ func DownloadFromOpenshift(consoleCliDownloadName string) SetupStrategy {
 
 func LocalBinary() SetupStrategy {
 	return func(ctx context.Context, c *cli) (string, error) {
+		logrus.Info("Checking local binary '", c.Name, "'")
 		return exec.LookPath(c.Name)
 	}
 

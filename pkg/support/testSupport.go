@@ -37,6 +37,7 @@ func DockerAuth() (string, error) {
 
 func GitClone(url string, branch string) (string, *git.Repository, error) {
 	dir, err := os.MkdirTemp("", "sigstore")
+	logrus.Info("Temporary folder created: ", dir)
 	if err != nil {
 		return "", nil, err
 	}
