@@ -44,7 +44,7 @@ func (c *cli) CommandOutput(ctx context.Context, args ...string) ([]byte, error)
 	return cmd.Output()
 }
 
-func (c *cli) WithSetupStrategies(strategies []SetupStrategy) *cli {
+func (c *cli) WithSetupStrategies(strategies ...SetupStrategy) *cli {
 	c.setupStrategies = strategies
 	return c
 }
