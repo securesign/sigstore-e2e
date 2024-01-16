@@ -6,7 +6,6 @@ import (
 
 	projectv1 "github.com/openshift/api/project/v1"
 	"github.com/sirupsen/logrus"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -116,16 +115,4 @@ func (c *defaultClient) DeleteProject(ctx context.Context, name string) error {
 			Name: name,
 		},
 	})
-}
-
-// IsOpenShift returns true if we are connected to a OpenShift cluster.
-func IsOpenShift() (bool, error) {
-	_, err := K8sClient.Discovery().ServerResourcesForGroupVersion("image.openshift.io/v1")
-	if err != nil && k8serrors.IsNotFound(err) {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	return true, nil
 }

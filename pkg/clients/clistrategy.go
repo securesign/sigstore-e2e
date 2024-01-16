@@ -27,30 +27,10 @@ func PreferredSetupStrategy() SetupStrategy {
 		preferredStrategy = DownloadFromOpenshift()
 	case "local":
 		preferredStrategy = LocalBinary()
-	case "openshiftorlocal":
-		preferredStrategy = OpenshiftOrLocalBinary()
 	default:
 		preferredStrategy = LocalBinary()
 	}
 	return preferredStrategy
-}
-
-// Get binaries from Openshift Console if Openshift cluster is used
-// or use local binary for all other cases.
-func OpenshiftOrLocalBinary() SetupStrategy {
-	return func(ctx context.Context, c *cli) (string, error) {
-		isOpenshift, err := kubernetes.IsOpenShift()
-		if err != nil {
-			return "", err
-		}
-		if isOpenshift {
-			logrus.Info("Cluster detected as Openshift - getting binary from it")
-			return DownloadFromOpenshift()(ctx, c)
-		} else {
-			logrus.Info("Cluster detected, but not Openshift - using local binary instead")
-			return LocalBinary()(ctx, c)
-		}
-	}
 }
 
 func BuildFromGit(url string, branch string, buildingDirectory string) SetupStrategy {
