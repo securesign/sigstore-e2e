@@ -58,7 +58,7 @@ func (c *cli) Setup(ctx context.Context) error {
 			_ = c.Command(ctx, c.versionCommand).Run()
 		}
 	} else {
-		logrus.Warn("Failed due to\n   ", err)
+		logrus.Error("Failed due to\n   ", err)
 	}
 	return err
 }
