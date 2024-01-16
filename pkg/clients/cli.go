@@ -22,10 +22,10 @@ import (
 )
 
 type cli struct {
-	Name            string
-	pathToCLI       string
-	setupStrategies []SetupStrategy
-	versionCommand  string
+	Name           string
+	pathToCLI      string
+	setupStrategy  SetupStrategy
+	versionCommand string
 }
 
 type SetupStrategy func(context.Context, *cli) (string, error)
@@ -44,22 +44,20 @@ func (c *cli) CommandOutput(ctx context.Context, args ...string) ([]byte, error)
 	return cmd.Output()
 }
 
-func (c *cli) WithSetupStrategies(strategies ...SetupStrategy) *cli {
-	c.setupStrategies = strategies
+func (c *cli) WithSetupStrategy(strategy SetupStrategy) *cli {
+	c.setupStrategy = strategy
 	return c
 }
 
 func (c *cli) Setup(ctx context.Context) error {
 	var err error
-	for _, setupStrategy := range c.setupStrategies {
-		c.pathToCLI, err = setupStrategy(ctx, c)
-		if err == nil {
-			if c.versionCommand != "" {
-				logrus.Info("Done. Using '", c.pathToCLI, "' with version:")
-				_ = c.Command(ctx, c.versionCommand).Run()
-			}
-			break
+	c.pathToCLI, err = c.setupStrategy(ctx, c)
+	if err == nil {
+		if c.versionCommand != "" {
+			logrus.Info("Done. Using '", c.pathToCLI, "' with version:")
+			_ = c.Command(ctx, c.versionCommand).Run()
 		}
+	} else {
 		logrus.Warn("Failed due to\n   ", err)
 	}
 	return err
@@ -67,6 +65,22 @@ func (c *cli) Setup(ctx context.Context) error {
 
 func (c *cli) Destroy(_ context.Context) error {
 	return nil
+}
+
+func OpenshiftOrLocalBinary() SetupStrategy {
+	return func(ctx context.Context, c *cli) (string, error) {
+		isOpenshift, err := kubernetes.IsOpenShift()
+		if err != nil {
+			return "", err
+		}
+		if isOpenshift {
+			logrus.Debug("Cluster detected as Openshift - getting binary from it")
+			return DownloadFromOpenshift()(ctx, c)
+		} else {
+			logrus.Debug("Cluster detected, but not Openshift - using local binary instead")
+			return LocalBinary()(ctx, c)
+		}
+	}
 }
 
 func BuildFromGit(url string, branch string, buildingDirectory string) SetupStrategy {
@@ -83,7 +97,6 @@ func BuildFromGit(url string, branch string, buildingDirectory string) SetupStra
 
 		return dir + "/" + c.Name, err
 	}
-
 }
 
 func DownloadFromOpenshift() SetupStrategy {
@@ -114,7 +127,6 @@ func DownloadFromOpenshift() SetupStrategy {
 
 		return file.Name(), err
 	}
-
 }
 
 func LocalBinary() SetupStrategy {
@@ -122,7 +134,6 @@ func LocalBinary() SetupStrategy {
 		logrus.Info("Checking local binary '", c.Name, "'")
 		return exec.LookPath(c.Name)
 	}
-
 }
 
 func ExtractFromContainer(image string, path string) SetupStrategy {

@@ -1,7 +1,5 @@
 package clients
 
-import "github.com/securesign/sigstore-e2e/pkg/api"
-
 type Cosign struct {
 	*cli
 }
@@ -9,12 +7,8 @@ type Cosign struct {
 func NewCosign() *Cosign {
 	return &Cosign{
 		&cli{
-			Name: "cosign",
-			setupStrategies: []SetupStrategy{
-				DownloadFromOpenshift(),
-				BuildFromGit(api.GetValueFor(api.CosignRepo), api.GetValueFor(api.CosignRepoBranch), "./cmd/cosign"),
-				LocalBinary(),
-			},
+			Name:           "cosign",
+			setupStrategy:  OpenshiftOrLocalBinary(),
 			versionCommand: "version",
 		}}
 }

@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/securesign/sigstore-e2e/pkg/api"
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,12 +16,8 @@ type Gitsign struct {
 func NewGitsign() *Gitsign {
 	return &Gitsign{
 		&cli{
-			Name: "gitsign",
-			setupStrategies: []SetupStrategy{
-				DownloadFromOpenshift(),
-				BuildFromGit(api.GetValueFor(api.GitsignRepo), api.GetValueFor(api.GitsignRepoBranch), "."),
-				LocalBinary(),
-			},
+			Name:           "gitsign",
+			setupStrategy:  OpenshiftOrLocalBinary(),
 			versionCommand: "--version",
 		}}
 }
