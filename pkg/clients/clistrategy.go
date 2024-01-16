@@ -36,7 +36,7 @@ func PreferredSetupStrategy() SetupStrategy {
 }
 
 // Get binaries from Openshift Console if Openshift cluster is used
-// or use local binary for all other cases
+// or use local binary for all other cases.
 func OpenshiftOrLocalBinary() SetupStrategy {
 	return func(ctx context.Context, c *cli) (string, error) {
 		isOpenshift, err := kubernetes.IsOpenShift()
