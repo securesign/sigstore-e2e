@@ -17,7 +17,7 @@ func NewGitsign() *Gitsign {
 	return &Gitsign{
 		&cli{
 			Name:           "gitsign",
-			setupStrategy:  OpenshiftOrLocalBinary(),
+			setupStrategy:  PreferredSetupStrategy(),
 			versionCommand: "--version",
 		}}
 }
