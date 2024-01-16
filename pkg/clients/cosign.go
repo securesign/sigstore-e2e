@@ -8,7 +8,7 @@ func NewCosign() *Cosign {
 	return &Cosign{
 		&cli{
 			Name:           "cosign",
-			setupStrategy:  OpenshiftOrLocalBinary(),
+			setupStrategy:  PreferredSetupStrategy(),
 			versionCommand: "version",
 		}}
 }
