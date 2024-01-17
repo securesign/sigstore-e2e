@@ -16,8 +16,9 @@ type Gitsign struct {
 func NewGitsign() *Gitsign {
 	return &Gitsign{
 		&cli{
-			Name:  "gitsign",
-			setup: DownloadFromOpenshift("gitsign"),
+			Name:           "gitsign",
+			setupStrategy:  PreferredSetupStrategy(),
+			versionCommand: "--version",
 		}}
 }
 

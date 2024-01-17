@@ -13,6 +13,7 @@ const (
 	GithubUsername = "TEST_GITHUB_USER"
 	GithubOwner    = "TEST_GITHUB_OWNER"
 	GithubRepo     = "TEST_GITHUB_REPO"
+	CliStrategy    = "CLI_STRATEGY"
 
 	// 'DockerRegistry*' - Login credentials for 'registry.redhat.io'.
 	DockerRegistryUsername = "REGISTRY_USERNAME"
@@ -28,6 +29,7 @@ func init() {
 	Values.SetDefault(GithubUsername, "ignore")
 	Values.SetDefault(GithubOwner, "securesign")
 	Values.SetDefault(GithubRepo, "e2e-gitsign-test")
+	Values.SetDefault(CliStrategy, "local")
 	Values.AutomaticEnv()
 }
 

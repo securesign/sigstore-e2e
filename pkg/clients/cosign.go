@@ -7,7 +7,8 @@ type Cosign struct {
 func NewCosign() *Cosign {
 	return &Cosign{
 		&cli{
-			Name:  "cosign",
-			setup: DownloadFromOpenshift("cosign"),
+			Name:           "cosign",
+			setupStrategy:  PreferredSetupStrategy(),
+			versionCommand: "version",
 		}}
 }

@@ -108,6 +108,7 @@ func (c *defaultClient) CreateProject(ctx context.Context, name string) error {
 	logrus.Debug("Creating new project ", name)
 	return c.Create(ctx, request)
 }
+
 func (c *defaultClient) DeleteProject(ctx context.Context, name string) error {
 	return c.Delete(ctx, &projectv1.Project{
 		ObjectMeta: metav1.ObjectMeta{
