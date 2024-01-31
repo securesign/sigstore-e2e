@@ -29,7 +29,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 	targetImageName := "ttl.sh/" + uuid.New().String() + ":5m"
 
 	BeforeAll(func() {
-		err = testsupport.CheckAPIConfigValues(testsupport.Mandatory, api.FulcioURL, api.RekorURL, api.TufURL, api.OidcIssuerURL, api.OidcRealm)
+		err = testsupport.CheckAPIConfigValues(testsupport.Mandatory, api.OidcIssuerURL, api.OidcRealm)
 		if err != nil {
 			Skip("Skip this test - " + err.Error())
 		}
@@ -69,9 +69,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 	Describe("Cosign initialize", func() {
 		It("should initialize the cosign root", func() {
-			Expect(cosign.Command(testsupport.TestContext, "initialize",
-				"--mirror="+api.GetValueFor(api.TufURL),
-				"--root="+api.GetValueFor(api.TufURL)+"/root.json").Run()).To(Succeed())
+			Expect(cosign.Command(testsupport.TestContext, "initialize").Run()).To(Succeed())
 		})
 	})
 
@@ -80,13 +78,13 @@ var _ = Describe("Cosign test", Ordered, func() {
 			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.GetValueFor(api.OidcIssuerURL), "jdoe", "secure", api.GetValueFor(api.OidcRealm))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cosign.Command(testsupport.TestContext, "sign",
-				"-y", "--fulcio-url="+api.GetValueFor(api.FulcioURL), "--rekor-url="+api.GetValueFor(api.RekorURL), "--oidc-issuer="+api.GetValueFor(api.OidcIssuerURL), "--identity-token="+token, targetImageName).Run()).To(Succeed())
+				"-y", "--identity-token="+token, targetImageName).Run()).To(Succeed())
 		})
 	})
 
 	Describe("cosign verify", func() {
 		It("should verify the signature", func() {
-			Expect(cosign.Command(testsupport.TestContext, "verify", "--rekor-url="+api.GetValueFor(api.RekorURL), "--certificate-identity-regexp", ".*@redhat", "--certificate-oidc-issuer-regexp", ".*keycloak.*", targetImageName).Run()).To(Succeed())
+			Expect(cosign.Command(testsupport.TestContext, "verify", "--certificate-identity-regexp", ".*@redhat", "--certificate-oidc-issuer-regexp", ".*keycloak.*", targetImageName).Run()).To(Succeed())
 		})
 	})
 })

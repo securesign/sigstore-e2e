@@ -3,12 +3,11 @@ package api
 import "github.com/spf13/viper"
 
 const (
-	FulcioURL      = "FULCIO_URL"
-	RekorURL       = "REKOR_URL"
+	FulcioURL      = "SIGSTORE_FULCIO_URL"
+	RekorURL       = "SIGSTORE_REKOR_URL"
 	TufURL         = "TUF_URL"
-	OidcIssuerURL  = "OIDC_ISSUER_URL"
+	OidcIssuerURL  = "SIGSTORE_OIDC_ISSUER"
 	OidcRealm      = "KEYCLOAK_REALM"
-	KeycloakURL    = "KEYCLOAK_URL"
 	GithubToken    = "TEST_GITHUB_TOKEN" // #nosec G101: Potential hardcoded credentials (gosec)
 	GithubUsername = "TEST_GITHUB_USER"
 	GithubOwner    = "TEST_GITHUB_OWNER"
