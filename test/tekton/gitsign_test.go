@@ -45,8 +45,7 @@ var _ = Describe("gitsign test", Ordered, func() {
 	)
 
 	BeforeAll(func() {
-		err = testsupport.CheckAPIConfigValues(testsupport.Mandatory, api.GithubToken, api.GithubUsername, api.GithubOwner, api.GithubRepo,
-			api.FulcioURL, api.RekorURL, api.OidcIssuerURL, api.TufURL, api.OidcRealm)
+		err = testsupport.CheckMandatoryAPIConfigValues(api.GithubToken, api.GithubUsername, api.GithubOwner, api.GithubRepo, api.OidcRealm)
 		if err != nil {
 			Skip("Skip this test - " + err.Error())
 		}

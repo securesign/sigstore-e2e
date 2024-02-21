@@ -29,7 +29,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		err    error
 	)
 	BeforeAll(func() {
-		err = testsupport.CheckAPIConfigValues(testsupport.Mandatory, api.FulcioURL, api.RekorURL, api.OidcIssuerURL, api.TufURL)
+		err = testsupport.CheckAnyTestMandatoryAPIConfigValues()
 		if err != nil {
 			Skip("Skip this test - " + err.Error())
 		}
@@ -111,9 +111,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 	Describe("Verify the commit", func() {
 		Context("With initialized Fulcio CA", func() {
 			It("initialize cosign", func() {
-				Expect(cosign.Command(testsupport.TestContext, "initialize",
-					"--mirror="+api.GetValueFor(api.TufURL),
-					"--root="+api.GetValueFor(api.TufURL)+"/root.json").Run()).To(Succeed())
+				Expect(cosign.Command(testsupport.TestContext, "initialize").Run()).To(Succeed())
 			})
 		})
 
