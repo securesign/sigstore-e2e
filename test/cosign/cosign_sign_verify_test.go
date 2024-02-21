@@ -58,7 +58,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 		Expect(dockerCli.ImageTag(testsupport.TestContext, testImage, targetImageName)).To(Succeed())
 		var push io.ReadCloser
-		push, err = dockerCli.ImagePush(testsupport.TestContext, targetImageName, types.ImagePushOptions{RegistryAuth: types.RegistryAuthFromSpec})
+		push, err = dockerCli.ImagePush(testsupport.TestContext, targetImageName, types.ImagePushOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		_, err = io.Copy(os.Stdout, push)
 		Expect(err).ToNot(HaveOccurred())
