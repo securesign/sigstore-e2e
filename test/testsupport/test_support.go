@@ -35,6 +35,8 @@ const (
 var (
 	TestContext       context.Context
 	TestTimeoutMedium = 5 * time.Minute
+	// Config keys that must be defined for any test.
+	mandatoryAPIConfigKeys = []string{api.OidcIssuerURL, api.FulcioURL, api.RekorURL, api.TufURL}
 )
 
 var installedStack []api.TestPrerequisite = make([]api.TestPrerequisite, 0)
@@ -140,7 +142,20 @@ func GetOIDCToken(ctx context.Context, issuerURL string, userName string, passwo
 	return fmt.Sprintf("%v", jsonOut["access_token"]), nil
 }
 
-func CheckAPIConfigValues(failOnMissing bool, keys ...string) error {
+func CheckAnyTestMandatoryAPIConfigValues() error {
+	return checkAPIConfigValues(Mandatory, mandatoryAPIConfigKeys...)
+}
+
+func CheckMandatoryAPIConfigValues(keys ...string) error {
+	mandatoryAPIConfigKeys = append(mandatoryAPIConfigKeys, keys...)
+	return checkAPIConfigValues(Mandatory, mandatoryAPIConfigKeys...)
+}
+
+func CheckOptionalAPIConfigValues(keys ...string) error {
+	return checkAPIConfigValues(Optional, keys...)
+}
+
+func checkAPIConfigValues(failOnMissing bool, keys ...string) error {
 	mandatoryMissing := false
 	errorMessage := "Missing configuration for"
 	if failOnMissing {

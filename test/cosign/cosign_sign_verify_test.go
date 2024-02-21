@@ -29,7 +29,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 	targetImageName := "ttl.sh/" + uuid.New().String() + ":5m"
 
 	BeforeAll(func() {
-		err = testsupport.CheckAPIConfigValues(testsupport.Mandatory, api.OidcIssuerURL, api.OidcRealm)
+		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm)
 		if err != nil {
 			Skip("Skip this test - " + err.Error())
 		}
