@@ -1,4 +1,4 @@
-BRANCH ?= main
+BRANCH ?= release-1.0.gamma
 REPO_URL ?= "https://github.com/securesign/sigstore-ocp.git"
 WORKDIR := $(shell mktemp -d)
 
