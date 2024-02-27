@@ -1,10 +1,15 @@
 package gitsign
 
 import (
-	"os"
-	"time"
-
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"github.com/securesign/sigstore-e2e/test/testsupport"
+	"os"
+	"os/exec"
+	"regexp"
+	"strings"
+	"time"
 
 	"github.com/securesign/sigstore-e2e/pkg/clients"
 
@@ -18,9 +23,29 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var logIndex string
+var hashValue string
+
+type RekorCLIOutput struct {
+	HashedRekordObj struct {
+		Data struct {
+			Hash struct {
+				Value string `json:"value"`
+			} `json:"hash"`
+		} `json:"data"`
+		Signature struct {
+			Content   string `json:"content"`
+			PublicKey struct {
+				Content string `json:"content"`
+			} `json:"publicKey"`
+		} `json:"signature"`
+	} `json:"HashedRekordObj"`
+}
+
 var _ = Describe("Signing and verifying commits by using Gitsign from the command-line interface", Ordered, func() {
 	var gitsign = clients.NewGitsign()
 	var cosign = clients.NewCosign()
+	var rekorCli = clients.NewRekorCli()
 
 	var (
 		dir    string
@@ -37,6 +62,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		Expect(testsupport.InstallPrerequisites(
 			gitsign,
 			cosign,
+			rekorCli,
 		)).To(Succeed())
 
 		DeferCleanup(func() {
@@ -117,15 +143,88 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 
 		When("commiter is authorized", func() {
 			It("should verify HEAD signature by gitsign", func() {
-				cmd := gitsign.Command(testsupport.TestContext, "verify",
+				cmd := exec.CommandContext(testsupport.TestContext, "gitsign", "verify",
 					"--certificate-identity", "jdoe@redhat.com",
 					"--certificate-oidc-issuer", api.GetValueFor(api.OidcIssuerURL),
 					"HEAD")
+
 				cmd.Dir = dir
+
 				// gitsign requires to find git in PATH
 				cmd.Env = os.Environ()
+
+				var output bytes.Buffer
+
+				cmd.Stdout = &output
+
 				Expect(cmd.Run()).To(Succeed())
+				logrus.Info(string(output.Bytes()))
+
+				re := regexp.MustCompile(`tlog index: (\d+)`)
+				match := re.FindStringSubmatch(string(output.Bytes()))
+
+				logIndex = match[1]
 			})
+		})
+	})
+
+	Describe("rekor-cli get with logIndex", func() {
+		It("should retrieve the entry from Rekor", func() {
+			// Assuming `logIndex` is obtained from previous tests or steps
+			rekorServerURL := api.GetValueFor(api.RekorURL)
+
+			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", logIndex)
+			Expect(err).ToNot(HaveOccurred())
+
+			logrus.Info(string(output))
+
+			startIndex := strings.Index(string(output), "{")
+			if startIndex == -1 {
+				// Handle error: JSON start not found
+				return
+			}
+			jsonStr := string(output[startIndex:])
+
+			var result RekorCLIOutput
+			err = json.Unmarshal([]byte(jsonStr), &result)
+			Expect(err).ToNot(HaveOccurred())
+
+			signatureContent := result.HashedRekordObj.Signature.Content
+			publicKeyContent := result.HashedRekordObj.Signature.PublicKey.Content
+			hashValue = result.HashedRekordObj.Data.Hash.Value
+
+			decodedSignatureContent, err := base64.StdEncoding.DecodeString(signatureContent)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Decode publicKeyContent from base64
+			decodedPublicKeyContent, err := base64.StdEncoding.DecodeString(publicKeyContent)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = os.WriteFile("publickey.pem", decodedPublicKeyContent, 0644) // 0644 provides read and write permissions to the owner, and read permission to others
+			Expect(err).ToNot(HaveOccurred())
+
+			// Write decoded signature content to signature.bin
+			err = os.WriteFile("signature.bin", decodedSignatureContent, 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+		})
+	})
+
+	Describe("Rekor CLI Verify Artifact", func() {
+		It("should verify the artifact using rekor-cli", func() {
+			rekorServerURL := api.GetValueFor(api.RekorURL) // Ensure this is the correct way to retrieve your Rekor server URL
+			// Ensure hashValue, signature.bin, and publickey.pem are available and correctly set up before this step.
+
+			Expect(rekorCli.Command(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", "signature.bin", "--public-key", "publickey.pem", "--pki-format", "x509", "--type", "hashedrekord:0.0.1", "--artifact-hash", hashValue).Run()).To(Succeed())
+		})
+
+		AfterEach(func() {
+			// Attempt to remove signature.bin and publickey.pem after each test
+			err := os.Remove("signature.bin")
+			Expect(err).ToNot(HaveOccurred())
+
+			err = os.Remove("publickey.pem")
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 })
