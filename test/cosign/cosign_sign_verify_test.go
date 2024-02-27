@@ -72,10 +72,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 		rekorCli = clients.NewRekorCli()
 
-		Expect(testsupport.InstallPrerequisites(
-			cosign,
-			rekorCli,
-		)).To(Succeed())
+		Expect(testsupport.InstallPrerequisites(cosign, rekorCli)).To(Succeed())
 
 		DeferCleanup(func() {
 			if err := testsupport.DestroyPrerequisites(); err != nil {
@@ -114,8 +111,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 		It("should sign the container", func() {
 			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.GetValueFor(api.OidcIssuerURL), "jdoe", "secure", api.GetValueFor(api.OidcRealm))
 			Expect(err).ToNot(HaveOccurred())
-			Expect(cosign.Command(testsupport.TestContext, "sign",
-				"-y", "--identity-token="+token, targetImageName).Run()).To(Succeed())
+			Expect(cosign.Command(testsupport.TestContext, "sign", "-y", "--identity-token="+token, targetImageName).Run()).To(Succeed())
 		})
 	})
 
@@ -123,6 +119,8 @@ var _ = Describe("Cosign test", Ordered, func() {
 		It("should verify the signature and extract logIndex", func() {
 			output, err := cosign.CommandOutput(testsupport.TestContext, "verify", "--certificate-identity-regexp", ".*@redhat", "--certificate-oidc-issuer-regexp", ".*keycloak.*", targetImageName)
 			Expect(err).ToNot(HaveOccurred())
+
+			logrus.Info(string(output))
 
 			startIndex := strings.Index(string(output), "[")
 			if startIndex == -1 {
@@ -147,6 +145,8 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", logIndexStr)
 			Expect(err).ToNot(HaveOccurred())
+
+			logrus.Info(string(output))
 
 			startIndex := strings.Index(string(output), "{")
 			if startIndex == -1 {
@@ -185,9 +185,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL) // Ensure this is the correct way to retrieve your Rekor server URL
 			// Ensure hashValue, signature.bin, and publickey.pem are available and correctly set up before this step.
 
-			Expect(rekorCli.Command(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL,
-				"--signature", "signature.bin", "--public-key", "publickey.pem", "--pki-format", "x509", "--type",
-				"hashedrekord:0.0.1", "--artifact-hash", hashValue).Run()).To(Succeed())
+			Expect(rekorCli.Command(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", "signature.bin", "--public-key", "publickey.pem", "--pki-format", "x509", "--type", "hashedrekord:0.0.1", "--artifact-hash", hashValue).Run()).To(Succeed())
 		})
 
 		AfterEach(func() {
