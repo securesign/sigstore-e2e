@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/securesign/sigstore-e2e/test/testsupport"
 	"os"
-	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
-	"path/filepath"
+
+	"github.com/securesign/sigstore-e2e/test/testsupport"
 
 	"github.com/securesign/sigstore-e2e/pkg/clients"
 
@@ -150,7 +150,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 
 		When("commiter is authorized", func() {
 			It("should verify HEAD signature by gitsign", func() {
-				cmd := exec.CommandContext(testsupport.TestContext, "gitsign", "verify",
+				cmd := gitsign.Command(testsupport.TestContext, "verify",
 					"--certificate-identity", "jdoe@redhat.com",
 					"--certificate-oidc-issuer", api.GetValueFor(api.OidcIssuerURL),
 					"HEAD")
@@ -207,8 +207,6 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 			decodedPublicKeyContent, err := base64.StdEncoding.DecodeString(publicKeyContent)
 			Expect(err).ToNot(HaveOccurred())
 
-			
-
 			publicKeyPath = filepath.Join(tempDir, "publickey.pem")
 			signaturePath = filepath.Join(tempDir, "signature.bin")
 
@@ -228,6 +226,6 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 })
 
 var _ = AfterSuite(func() {
-    // Cleanup shared resources after all tests have run.
-    Expect(os.RemoveAll(tempDir)).To(Succeed())
+	// Cleanup shared resources after all tests have run.
+	Expect(os.RemoveAll(tempDir)).To(Succeed())
 })
