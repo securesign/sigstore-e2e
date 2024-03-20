@@ -17,8 +17,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var isValidPath = regexp.MustCompile(`^[a-zA-Z0-9_-]+\.tar$`).MatchString
-
 var entryIndex int
 var hashWithAlg string
 var tempDir string
