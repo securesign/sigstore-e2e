@@ -9,7 +9,8 @@ import (
 	"strings"
 	"time"
 	"path/filepath"
-
+	"regexp"
+	
 	"github.com/securesign/sigstore-e2e/pkg/api"
 	"github.com/securesign/sigstore-e2e/pkg/clients"
 	"github.com/securesign/sigstore-e2e/test/testsupport"
@@ -179,8 +180,8 @@ var _ = Describe("Cosign test", Ordered, func() {
 			publicKeyPath = filepath.Join(tempDir, "publickey.pem")
 			signaturePath = filepath.Join(tempDir, "signature.bin")
 
-			Expect(os.WriteFile(publicKeyPath, decodedPublicKeyContent, 0644)).To(Succeed())
-			Expect(os.WriteFile(signaturePath, decodedSignatureContent, 0644)).To(Succeed())
+			Expect(os.WriteFile(publicKeyPath, decodedPublicKeyContent, 0600)).To(Succeed())
+			Expect(os.WriteFile(signaturePath, decodedSignatureContent, 0600)).To(Succeed())
 		})
 	})
 
