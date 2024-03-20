@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"path/filepath"
 
 	"github.com/securesign/sigstore-e2e/pkg/clients"
 
@@ -25,6 +26,9 @@ import (
 
 var logIndex string
 var hashValue string
+var tempDir string
+var publicKeyPath string
+var signaturePath string
 
 type RekorCLIOutput struct {
 	HashedRekordObj struct {
@@ -70,6 +74,9 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 				logrus.Warn("Env was not cleaned-up" + err.Error())
 			}
 		})
+
+		tempDir, err = os.MkdirTemp("", "rekorTest")
+		Expect(err).ToNot(HaveOccurred())
 
 		// initialize local git repository
 		dir, err = os.MkdirTemp("", "repository")
@@ -200,12 +207,13 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 			decodedPublicKeyContent, err := base64.StdEncoding.DecodeString(publicKeyContent)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = os.WriteFile("publickey.pem", decodedPublicKeyContent, 0644) // 0644 provides read and write permissions to the owner, and read permission to others
-			Expect(err).ToNot(HaveOccurred())
+			
 
-			// Write decoded signature content to signature.bin
-			err = os.WriteFile("signature.bin", decodedSignatureContent, 0644)
-			Expect(err).ToNot(HaveOccurred())
+			publicKeyPath = filepath.Join(tempDir, "publickey.pem")
+			signaturePath = filepath.Join(tempDir, "signature.bin")
+
+			Expect(os.WriteFile(publicKeyPath, decodedPublicKeyContent, 0644)).To(Succeed())
+			Expect(os.WriteFile(signaturePath, decodedSignatureContent, 0644)).To(Succeed())
 
 		})
 	})
@@ -214,17 +222,12 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		It("should verify the artifact using rekor-cli", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL) // Ensure this is the correct way to retrieve your Rekor server URL
 			// Ensure hashValue, signature.bin, and publickey.pem are available and correctly set up before this step.
-
-			Expect(rekorCli.Command(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", "signature.bin", "--public-key", "publickey.pem", "--pki-format", "x509", "--type", "hashedrekord:0.0.1", "--artifact-hash", hashValue).Run()).To(Succeed())
-		})
-
-		AfterEach(func() {
-			// Attempt to remove signature.bin and publickey.pem after each test
-			err := os.Remove("signature.bin")
-			Expect(err).ToNot(HaveOccurred())
-
-			err = os.Remove("publickey.pem")
-			Expect(err).ToNot(HaveOccurred())
+			Expect(rekorCli.Command(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", signaturePath, "--public-key", publicKeyPath, "--pki-format", "x509", "--type", "hashedrekord:0.0.1", "--artifact-hash", hashValue).Run()).To(Succeed())
 		})
 	})
+})
+
+var _ = AfterSuite(func() {
+    // Cleanup shared resources after all tests have run.
+    Expect(os.RemoveAll(tempDir)).To(Succeed())
 })
