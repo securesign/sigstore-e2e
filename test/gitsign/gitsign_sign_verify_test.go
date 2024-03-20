@@ -165,10 +165,10 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 				cmd.Stdout = &output
 
 				Expect(cmd.Run()).To(Succeed())
-				logrus.Info(string(output.Bytes()))
+				logrus.Info(output.String())
 
 				re := regexp.MustCompile(`tlog index: (\d+)`)
-				match := re.FindStringSubmatch(string(output.Bytes()))
+				match := re.FindStringSubmatch(output.String())
 
 				logIndex = match[1]
 			})
@@ -212,8 +212,8 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 			publicKeyPath = filepath.Join(tempDir, "publickey.pem")
 			signaturePath = filepath.Join(tempDir, "signature.bin")
 
-			Expect(os.WriteFile(publicKeyPath, decodedPublicKeyContent, 0644)).To(Succeed())
-			Expect(os.WriteFile(signaturePath, decodedSignatureContent, 0644)).To(Succeed())
+			Expect(os.WriteFile(publicKeyPath, decodedPublicKeyContent, 0600)).To(Succeed())
+			Expect(os.WriteFile(signaturePath, decodedSignatureContent, 0600)).To(Succeed())
 
 		})
 	})

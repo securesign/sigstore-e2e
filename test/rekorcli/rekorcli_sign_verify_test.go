@@ -74,7 +74,7 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 
 		
 
-		//create directory and tar it
+		// create directory and tar it
 		tempDir, err = os.MkdirTemp("", "rekorTest")
 		Expect(err).ToNot(HaveOccurred())
 
@@ -82,20 +82,20 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 		tarFilePath = filepath.Join(tempDir, "myrelease.tar.gz")
 		signatureFilePath = filepath.Join(tempDir, "mysignature.asc")
 
-		//create directory and tar it
+		// create directory and tar it
 		err := os.Mkdir(dirFilePath, 0755) // 0755 = the folder will be readable and executed by others, but writable by the user only
 		if err != nil {
 			panic(err) // handle error
 		}
 
-		//now taring it for release
+		// now taring it for release
 		tarCmd := exec.Command("tar", "-czvf", tarFilePath, dirFilePath)
 		err = tarCmd.Run()
 		if err != nil {
 			panic(err) // handle error
 		}
 
-		//sign artifact with public key
+		// sign artifact with public key
 		opensslKey := exec.Command("openssl", "dgst", "-sha256", "-sign", "ec_private.pem", "-out", signatureFilePath, tarFilePath)
 		err = opensslKey.Run()
 		if err != nil {
@@ -169,7 +169,7 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 			entryIndexStr := strconv.Itoa(entryIndex)
 			
-			//extrract of hash value for searching with --sha
+			// extrract of hash value for searching with --sha
 			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", entryIndexStr)
 			Expect(err).ToNot(HaveOccurred())
 
