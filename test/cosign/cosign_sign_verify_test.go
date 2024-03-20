@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
-	"path/filepath"
-	
+
 	"github.com/securesign/sigstore-e2e/pkg/api"
 	"github.com/securesign/sigstore-e2e/pkg/clients"
 	"github.com/securesign/sigstore-e2e/test/testsupport"
@@ -194,6 +194,6 @@ var _ = Describe("Cosign test", Ordered, func() {
 })
 
 var _ = AfterSuite(func() {
-    // Cleanup shared resources after all tests have run.
-    Expect(os.RemoveAll(tempDir)).To(Succeed())
+	// Cleanup shared resources after all tests have run.
+	Expect(os.RemoveAll(tempDir)).To(Succeed())
 })

@@ -1,13 +1,13 @@
 package rekorcli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
-	"encoding/json"
-	"path/filepath"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,7 +34,7 @@ type RekorCLIOutput struct {
 		Data struct {
 			Hash struct {
 				Algorithm string `json:"algorithm"`
-				Value string `json:"value"`
+				Value     string `json:"value"`
 			} `json:"hash"`
 		} `json:"data"`
 		Signature struct {
@@ -72,8 +72,6 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			}
 		})
 
-		
-
 		// create directory and tar it
 		tempDir, err = os.MkdirTemp("", "rekorTest")
 		Expect(err).ToNot(HaveOccurred())
@@ -101,7 +99,6 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 		if err != nil {
 			panic(err)
 		}
-		
 
 	})
 
@@ -168,7 +165,7 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 		It("should get data from rekor server", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 			entryIndexStr := strconv.Itoa(entryIndex)
-			
+
 			// extrract of hash value for searching with --sha
 			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", entryIndexStr)
 			Expect(err).ToNot(HaveOccurred())
@@ -183,7 +180,7 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			var result RekorCLIOutput
 			err = json.Unmarshal([]byte(jsonStr), &result)
 			Expect(err).ToNot(HaveOccurred())
-			
+
 			// algorithm:hashValue
 			hashWithAlg = result.RekordObj.Data.Hash.Algorithm + ":" + result.RekordObj.Data.Hash.Value
 		})
@@ -209,7 +206,7 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			rekorKey := "ec_public.pem"
 			Expect(rekorCli.Command(testsupport.TestContext, "search", "--rekor_server", rekorServerURL, "--public-key", rekorKey, "--pki-format=x509").Run()).To(Succeed())
 		})
-		
+
 	})
 
 	Describe("Search entries", func() {
@@ -221,6 +218,6 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 })
 
 var _ = AfterSuite(func() {
-    // Cleanup shared resources after all tests have run.
-    Expect(os.RemoveAll(tempDir)).To(Succeed())
+	// Cleanup shared resources after all tests have run.
+	Expect(os.RemoveAll(tempDir)).To(Succeed())
 })
