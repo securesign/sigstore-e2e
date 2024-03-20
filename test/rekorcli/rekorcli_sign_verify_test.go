@@ -17,6 +17,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var isValidPath = regexp.MustCompile(`^[a-zA-Z0-9_-]+\.tar$`).MatchString
+
 var entryIndex int
 var hashWithAlg string
 var tempDir string
@@ -157,7 +159,7 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 	Describe("Get with UUID", func() {
 		It("should get data from rekor server", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
-			Expect(rekorCli.Command(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--uuid", rekorHash).Run()).To(Succeed()) //UUID = Entry Hash here
+			Expect(rekorCli.Command(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--uuid", rekorHash).Run()).To(Succeed()) // UUID = Entry Hash here
 			Expect(err).ToNot(HaveOccurred())
 
 		})

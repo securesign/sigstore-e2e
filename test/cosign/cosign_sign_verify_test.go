@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 	"path/filepath"
-	"regexp"
 	
 	"github.com/securesign/sigstore-e2e/pkg/api"
 	"github.com/securesign/sigstore-e2e/pkg/clients"
