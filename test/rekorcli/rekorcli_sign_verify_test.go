@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"encoding/json"
+	"path/filepath"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -16,20 +18,23 @@ import (
 )
 
 var entryIndex int
-
-//var prefix string
+var hashWithAlg string
+var tempDir string
+var dirFilePath string
+var tarFilePath string
+var signatureFilePath string
 
 type rekorCliVerifyOutput struct {
 	RekorHash  string
 	EntryIndex int
 }
 
-type rekorHashOutput struct {
-	HashedRekordObj struct {
+type RekorCLIOutput struct {
+	RekordObj struct {
 		Data struct {
 			Hash struct {
-				Prefix string `json:"algorithm"`
-				Value  string `json:"value"`
+				Algorithm string `json:"algorithm"`
+				Value string `json:"value"`
 			} `json:"hash"`
 		} `json:"data"`
 		Signature struct {
@@ -38,7 +43,7 @@ type rekorHashOutput struct {
 				Content string `json:"content"`
 			} `json:"publicKey"`
 		} `json:"signature"`
-	} `json:"HashedRekordObj"`
+	} `json:"RekordObj"`
 }
 
 var _ = Describe("Verify entries, query the transparency log for inclusion proof", Ordered, func() {
@@ -47,8 +52,6 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 		err       error
 		rekorCli  *clients.RekorCli
 		rekorHash string
-		//hashValue string
-		//prefix string
 	)
 
 	BeforeAll(func() {
@@ -69,27 +72,36 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			}
 		})
 
+		
+
 		//create directory and tar it
-		var dir = "myrelease"
-		err := os.Mkdir(dir, 0755) // 0755 = the folder will be readable and executed by others, but writable by the user only
+		tempDir, err = os.MkdirTemp("", "rekorTest")
+		Expect(err).ToNot(HaveOccurred())
+
+		dirFilePath = filepath.Join(tempDir, "myrelease")
+		tarFilePath = filepath.Join(tempDir, "myrelease.tar.gz")
+		signatureFilePath = filepath.Join(tempDir, "mysignature.asc")
+
+		//create directory and tar it
+		err := os.Mkdir(dirFilePath, 0755) // 0755 = the folder will be readable and executed by others, but writable by the user only
 		if err != nil {
 			panic(err) // handle error
 		}
+
 		//now taring it for release
-		var tar = "myrelease.tar.gz"
-		tarCmd := exec.Command("tar", "-czvf", tar, dir)
+		tarCmd := exec.Command("tar", "-czvf", tarFilePath, dirFilePath)
 		err = tarCmd.Run()
 		if err != nil {
 			panic(err) // handle error
 		}
 
 		//sign artifact with public key
-		sign := "mysignature.asc"
-		opensslKey := exec.Command("openssl", "dgst", "-sha256", "-sign", "ec_private.pem", "-out", sign, tar)
+		opensslKey := exec.Command("openssl", "dgst", "-sha256", "-sign", "ec_private.pem", "-out", signatureFilePath, tarFilePath)
 		err = opensslKey.Run()
 		if err != nil {
 			panic(err)
 		}
+		
 
 	})
 
@@ -97,7 +109,7 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 		It("should upload artifact", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 			rekorKey := "ec_public.pem"
-			Expect(rekorCli.Command(testsupport.TestContext, "upload", "--rekor_server", rekorServerURL, "--signature", "mysignature.asc", "--pki-format=x509", "--public-key", rekorKey, "--artifact", "myrelease.tar.gz").Run()).To(Succeed())
+			Expect(rekorCli.Command(testsupport.TestContext, "upload", "--rekor_server", rekorServerURL, "--signature", signatureFilePath, "--pki-format=x509", "--public-key", rekorKey, "--artifact", tarFilePath).Run()).To(Succeed())
 		})
 	})
 	Describe("Verify upload", func() {
@@ -132,7 +144,7 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 			rekorKey := "ec_public.pem"
-			output, err := rekorCli.CommandOutput(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", "mysignature.asc", "--pki-format=x509", "--public-key", rekorKey, "--artifact", "myrelease.tar.gz")
+			output, err := rekorCli.CommandOutput(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", signatureFilePath, "--pki-format=x509", "--public-key", rekorKey, "--artifact", tarFilePath)
 			Expect(err).ToNot(HaveOccurred())
 			logrus.Info(string(output))
 			outputString := string(output)
@@ -156,34 +168,38 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 		It("should get data from rekor server", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 			entryIndexStr := strconv.Itoa(entryIndex)
+			
 			//extrract of hash value for searching with --sha
 			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", entryIndexStr)
 			Expect(err).ToNot(HaveOccurred())
 
 			logrus.Info(string(output))
-			startIndex := strings.Index(string(output), "{ ")
+			startIndex := strings.Index(string(output), "{")
 			if startIndex == -1 {
 				// Handle error: JSON start not found
 				return
 			}
-
+			jsonStr := string(output[startIndex:])
+			var result RekorCLIOutput
+			err = json.Unmarshal([]byte(jsonStr), &result)
+			Expect(err).ToNot(HaveOccurred())
+			
+			// algorithm:hashValue
+			hashWithAlg = result.RekordObj.Data.Hash.Algorithm + ":" + result.RekordObj.Data.Hash.Value
 		})
-
 	})
 
 	Describe("Get loginfo", func() {
 		It("should get loginfo from rekor server", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 			Expect(rekorCli.Command(testsupport.TestContext, "loginfo", "--rekor_server", rekorServerURL).Run()).To(Succeed())
-
 		})
 	})
 
 	Describe("Search entries", func() {
 		It("should search entries with artifact ", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
-			Expect(rekorCli.Command(testsupport.TestContext, "search", "--rekor_server", rekorServerURL, "--artifact", "myrelease.tar.gz").Run()).To(Succeed())
-
+			Expect(rekorCli.Command(testsupport.TestContext, "search", "--rekor_server", rekorServerURL, "--artifact", tarFilePath).Run()).To(Succeed())
 		})
 	})
 
@@ -193,26 +209,18 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			rekorKey := "ec_public.pem"
 			Expect(rekorCli.Command(testsupport.TestContext, "search", "--rekor_server", rekorServerURL, "--public-key", rekorKey, "--pki-format=x509").Run()).To(Succeed())
 		})
-		AfterEach(func() {
-
-			err := os.Remove("myrelease")
-			Expect(err).ToNot(HaveOccurred())
-
-			err = os.Remove("myrelease.tar.gz")
-			Expect(err).ToNot(HaveOccurred())
-
-			err = os.Remove("mysignature.asc")
-			Expect(err).ToNot(HaveOccurred())
-
-		})
-
+		
 	})
 
-	// Describe("Search entries", func() {
-	// 	It("should search entries with hash", func() {
-	// 		rekorServerURL := api.GetValueFor(api.RekorURL)
-	// 		Expect(rekorCli.Command(testsupport.TestContext, "search", "--rekor_server", rekorServerURL, "--sha", hashValue).Run()).To(Succeed())
-	// 	})
+	Describe("Search entries", func() {
+		It("should search entries with hash", func() {
+			rekorServerURL := api.GetValueFor(api.RekorURL)
+			Expect(rekorCli.Command(testsupport.TestContext, "search", "--rekor_server", rekorServerURL, "--sha", hashWithAlg).Run()).To(Succeed())
+		})
+	})
+})
 
-	// })
+var _ = AfterSuite(func() {
+    // Cleanup shared resources after all tests have run.
+    Expect(os.RemoveAll(tempDir)).To(Succeed())
 })
