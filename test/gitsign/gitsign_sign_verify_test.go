@@ -30,22 +30,6 @@ var tempDir string
 var publicKeyPath string
 var signaturePath string
 
-type RekorCLIOutput struct {
-	HashedRekordObj struct {
-		Data struct {
-			Hash struct {
-				Value string `json:"value"`
-			} `json:"hash"`
-		} `json:"data"`
-		Signature struct {
-			Content   string `json:"content"`
-			PublicKey struct {
-				Content string `json:"content"`
-			} `json:"publicKey"`
-		} `json:"signature"`
-	} `json:"HashedRekordObj"`
-}
-
 var _ = Describe("Signing and verifying commits by using Gitsign from the command-line interface", Ordered, func() {
 	var gitsign = clients.NewGitsign()
 	var cosign = clients.NewCosign()
@@ -75,6 +59,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 			}
 		})
 
+		// tempDir for publickey and signature
 		tempDir, err = os.MkdirTemp("", "rekorTest")
 		Expect(err).ToNot(HaveOccurred())
 
@@ -177,7 +162,6 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 
 	Describe("rekor-cli get with logIndex", func() {
 		It("should retrieve the entry from Rekor", func() {
-			// Assuming `logIndex` is obtained from previous tests or steps
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 
 			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", logIndex)
@@ -185,28 +169,29 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 
 			logrus.Info(string(output))
 
+			// Look for JSON start
 			startIndex := strings.Index(string(output), "{")
-			if startIndex == -1 {
-				// Handle error: JSON start not found
-				return
-			}
+			Expect(startIndex).NotTo(Equal(-1), "JSON start - '{' not found")
+
 			jsonStr := string(output[startIndex:])
 
-			var result RekorCLIOutput
-			err = json.Unmarshal([]byte(jsonStr), &result)
+			var rekorGetOutput testsupport.RekorCLIGetOutput
+			err = json.Unmarshal([]byte(jsonStr), &rekorGetOutput)
 			Expect(err).ToNot(HaveOccurred())
 
-			signatureContent := result.HashedRekordObj.Signature.Content
-			publicKeyContent := result.HashedRekordObj.Signature.PublicKey.Content
-			hashValue = result.HashedRekordObj.Data.Hash.Value
+			// Extract values from rekor-cli get output
+			signatureContent := rekorGetOutput.HashedRekordObj.Signature.Content
+			publicKeyContent := rekorGetOutput.HashedRekordObj.Signature.PublicKey.Content
+			hashValue = rekorGetOutput.HashedRekordObj.Data.Hash.Value
 
+			// Decode signatureContent and publicKeyContent from base64
 			decodedSignatureContent, err := base64.StdEncoding.DecodeString(signatureContent)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Decode publicKeyContent from base64
 			decodedPublicKeyContent, err := base64.StdEncoding.DecodeString(publicKeyContent)
 			Expect(err).ToNot(HaveOccurred())
 
+			// Create files in the tempDir
 			publicKeyPath = filepath.Join(tempDir, "publickey.pem")
 			signaturePath = filepath.Join(tempDir, "signature.bin")
 
@@ -218,8 +203,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 
 	Describe("Rekor CLI Verify Artifact", func() {
 		It("should verify the artifact using rekor-cli", func() {
-			rekorServerURL := api.GetValueFor(api.RekorURL) // Ensure this is the correct way to retrieve your Rekor server URL
-			// Ensure hashValue, signature.bin, and publickey.pem are available and correctly set up before this step.
+			rekorServerURL := api.GetValueFor(api.RekorURL)
 			Expect(rekorCli.Command(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", signaturePath, "--public-key", publicKeyPath, "--pki-format", "x509", "--type", "hashedrekord:0.0.1", "--artifact-hash", hashValue).Run()).To(Succeed())
 		})
 	})
