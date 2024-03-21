@@ -1,7 +1,13 @@
 package gitsign
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/securesign/sigstore-e2e/test/testsupport"
@@ -18,9 +24,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var logIndex string
+var hashValue string
+var tempDir string
+var publicKeyPath string
+var signaturePath string
+
 var _ = Describe("Signing and verifying commits by using Gitsign from the command-line interface", Ordered, func() {
 	var gitsign = clients.NewGitsign()
 	var cosign = clients.NewCosign()
+	var rekorCli = clients.NewRekorCli()
 
 	var (
 		dir    string
@@ -37,6 +50,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		Expect(testsupport.InstallPrerequisites(
 			gitsign,
 			cosign,
+			rekorCli,
 		)).To(Succeed())
 
 		DeferCleanup(func() {
@@ -44,6 +58,10 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 				logrus.Warn("Env was not cleaned-up" + err.Error())
 			}
 		})
+
+		// tempDir for publickey and signature
+		tempDir, err = os.MkdirTemp("", "rekorTest")
+		Expect(err).ToNot(HaveOccurred())
 
 		// initialize local git repository
 		dir, err = os.MkdirTemp("", "repository")
@@ -121,11 +139,77 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 					"--certificate-identity", "jdoe@redhat.com",
 					"--certificate-oidc-issuer", api.GetValueFor(api.OidcIssuerURL),
 					"HEAD")
+
 				cmd.Dir = dir
+
 				// gitsign requires to find git in PATH
 				cmd.Env = os.Environ()
+
+				var output bytes.Buffer
+
+				cmd.Stdout = &output
+
 				Expect(cmd.Run()).To(Succeed())
+				logrus.Info(output.String())
+
+				re := regexp.MustCompile(`tlog index: (\d+)`)
+				match := re.FindStringSubmatch(output.String())
+
+				logIndex = match[1]
 			})
 		})
 	})
+
+	Describe("rekor-cli get with logIndex", func() {
+		It("should retrieve the entry from Rekor", func() {
+			rekorServerURL := api.GetValueFor(api.RekorURL)
+
+			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", logIndex)
+			Expect(err).ToNot(HaveOccurred())
+
+			logrus.Info(string(output))
+
+			// Look for JSON start
+			startIndex := strings.Index(string(output), "{")
+			Expect(startIndex).NotTo(Equal(-1), "JSON start - '{' not found")
+
+			jsonStr := string(output[startIndex:])
+
+			var rekorGetOutput testsupport.RekorCLIGetOutput
+			err = json.Unmarshal([]byte(jsonStr), &rekorGetOutput)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Extract values from rekor-cli get output
+			signatureContent := rekorGetOutput.HashedRekordObj.Signature.Content
+			publicKeyContent := rekorGetOutput.HashedRekordObj.Signature.PublicKey.Content
+			hashValue = rekorGetOutput.HashedRekordObj.Data.Hash.Value
+
+			// Decode signatureContent and publicKeyContent from base64
+			decodedSignatureContent, err := base64.StdEncoding.DecodeString(signatureContent)
+			Expect(err).ToNot(HaveOccurred())
+
+			decodedPublicKeyContent, err := base64.StdEncoding.DecodeString(publicKeyContent)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Create files in the tempDir
+			publicKeyPath = filepath.Join(tempDir, "publickey.pem")
+			signaturePath = filepath.Join(tempDir, "signature.bin")
+
+			Expect(os.WriteFile(publicKeyPath, decodedPublicKeyContent, 0600)).To(Succeed())
+			Expect(os.WriteFile(signaturePath, decodedSignatureContent, 0600)).To(Succeed())
+
+		})
+	})
+
+	Describe("Rekor CLI Verify Artifact", func() {
+		It("should verify the artifact using rekor-cli", func() {
+			rekorServerURL := api.GetValueFor(api.RekorURL)
+			Expect(rekorCli.Command(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", signaturePath, "--public-key", publicKeyPath, "--pki-format", "x509", "--type", "hashedrekord:0.0.1", "--artifact-hash", hashValue).Run()).To(Succeed())
+		})
+	})
+})
+
+var _ = AfterSuite(func() {
+	// Cleanup shared resources after all tests have run.
+	Expect(os.RemoveAll(tempDir)).To(Succeed())
 })

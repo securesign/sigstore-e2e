@@ -1,8 +1,13 @@
 package cosign
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/securesign/sigstore-e2e/pkg/api"
@@ -19,12 +24,19 @@ import (
 
 const testImage string = "alpine:latest"
 
+var logIndex int
+var hashValue string
+var tempDir string
+var publicKeyPath string
+var signaturePath string
+
 var _ = Describe("Cosign test", Ordered, func() {
 
 	var (
 		err       error
 		dockerCli *client.Client
 		cosign    *clients.Cosign
+		rekorCli  *clients.RekorCli
 	)
 	targetImageName := "ttl.sh/" + uuid.New().String() + ":5m"
 
@@ -36,15 +48,19 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 		cosign = clients.NewCosign()
 
-		Expect(testsupport.InstallPrerequisites(
-			cosign,
-		)).To(Succeed())
+		rekorCli = clients.NewRekorCli()
+
+		Expect(testsupport.InstallPrerequisites(cosign, rekorCli)).To(Succeed())
 
 		DeferCleanup(func() {
 			if err := testsupport.DestroyPrerequisites(); err != nil {
 				logrus.Warn("Env was not cleaned-up" + err.Error())
 			}
 		})
+
+		// tempDir for publickey and signature
+		tempDir, err = os.MkdirTemp("", "rekorTest")
+		Expect(err).ToNot(HaveOccurred())
 
 		dockerCli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 		Expect(err).ToNot(HaveOccurred())
@@ -77,14 +93,81 @@ var _ = Describe("Cosign test", Ordered, func() {
 		It("should sign the container", func() {
 			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.GetValueFor(api.OidcIssuerURL), "jdoe", "secure", api.GetValueFor(api.OidcRealm))
 			Expect(err).ToNot(HaveOccurred())
-			Expect(cosign.Command(testsupport.TestContext, "sign",
-				"-y", "--identity-token="+token, targetImageName).Run()).To(Succeed())
+			Expect(cosign.Command(testsupport.TestContext, "sign", "-y", "--identity-token="+token, targetImageName).Run()).To(Succeed())
 		})
 	})
 
 	Describe("cosign verify", func() {
-		It("should verify the signature", func() {
-			Expect(cosign.Command(testsupport.TestContext, "verify", "--certificate-identity-regexp", ".*@redhat", "--certificate-oidc-issuer-regexp", ".*keycloak.*", targetImageName).Run()).To(Succeed())
+		It("should verify the signature and extract logIndex", func() {
+			output, err := cosign.CommandOutput(testsupport.TestContext, "verify", "--certificate-identity-regexp", ".*@redhat", "--certificate-oidc-issuer-regexp", ".*keycloak.*", targetImageName)
+			Expect(err).ToNot(HaveOccurred())
+
+			logrus.Info(string(output))
+
+			startIndex := strings.Index(string(output), "[")
+			Expect(startIndex).NotTo(Equal(-1), "JSON start - '[' not found")
+
+			jsonStr := string(output[startIndex:])
+
+			var cosignVerifyOutput testsupport.CosignVerifyOutput
+			err = json.Unmarshal([]byte(jsonStr), &cosignVerifyOutput)
+			Expect(err).ToNot(HaveOccurred())
+
+			logIndex = cosignVerifyOutput[0].Optional.Bundle.Payload.LogIndex
 		})
 	})
+
+	Describe("rekor-cli get with logIndex", func() {
+		It("should retrieve the entry from Rekor", func() {
+			rekorServerURL := api.GetValueFor(api.RekorURL)
+			logIndexStr := strconv.Itoa(logIndex)
+
+			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", logIndexStr)
+			Expect(err).ToNot(HaveOccurred())
+
+			logrus.Info(string(output))
+
+			// Look for JSON start
+			startIndex := strings.Index(string(output), "{")
+			Expect(startIndex).NotTo(Equal(-1), "JSON start - '{' not found")
+
+			jsonStr := string(output[startIndex:])
+
+			var rekorGetOutput testsupport.RekorCLIGetOutput
+			err = json.Unmarshal([]byte(jsonStr), &rekorGetOutput)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Extract values from rekor-cli get output
+			signatureContent := rekorGetOutput.HashedRekordObj.Signature.Content
+			publicKeyContent := rekorGetOutput.HashedRekordObj.Signature.PublicKey.Content
+			hashValue = rekorGetOutput.HashedRekordObj.Data.Hash.Value
+
+			// Decode signatureContent and publicKeyContent from base64
+			decodedSignatureContent, err := base64.StdEncoding.DecodeString(signatureContent)
+			Expect(err).ToNot(HaveOccurred())
+
+			decodedPublicKeyContent, err := base64.StdEncoding.DecodeString(publicKeyContent)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Create files in the tempDir
+			publicKeyPath = filepath.Join(tempDir, "publickey.pem")
+			signaturePath = filepath.Join(tempDir, "signature.bin")
+
+			Expect(os.WriteFile(publicKeyPath, decodedPublicKeyContent, 0600)).To(Succeed())
+			Expect(os.WriteFile(signaturePath, decodedSignatureContent, 0600)).To(Succeed())
+		})
+	})
+
+	Describe("rekor-cli verify artifact", func() {
+		It("should verify the artifact using rekor-cli", func() {
+			rekorServerURL := api.GetValueFor(api.RekorURL)
+
+			Expect(rekorCli.Command(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", signaturePath, "--public-key", publicKeyPath, "--pki-format", "x509", "--type", "hashedrekord:0.0.1", "--artifact-hash", hashValue).Run()).To(Succeed())
+		})
+	})
+})
+
+var _ = AfterSuite(func() {
+	// Cleanup shared resources after all tests have run.
+	Expect(os.RemoveAll(tempDir)).To(Succeed())
 })
