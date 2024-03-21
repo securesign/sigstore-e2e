@@ -30,32 +30,6 @@ var tempDir string
 var publicKeyPath string
 var signaturePath string
 
-type CosignVerificationOutput []struct {
-	Optional struct {
-		Bundle struct {
-			Payload struct {
-				LogIndex int `json:"logIndex"`
-			} `json:"Payload"`
-		} `json:"Bundle"`
-	} `json:"optional"`
-}
-
-type RekorCLIOutput struct {
-	HashedRekordObj struct {
-		Data struct {
-			Hash struct {
-				Value string `json:"value"`
-			} `json:"hash"`
-		} `json:"data"`
-		Signature struct {
-			Content   string `json:"content"`
-			PublicKey struct {
-				Content string `json:"content"`
-			} `json:"publicKey"`
-		} `json:"signature"`
-	} `json:"HashedRekordObj"`
-}
-
 var _ = Describe("Cosign test", Ordered, func() {
 
 	var (
@@ -84,6 +58,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 			}
 		})
 
+		// tempDir for publickey and signature
 		tempDir, err = os.MkdirTemp("", "rekorTest")
 		Expect(err).ToNot(HaveOccurred())
 
@@ -130,17 +105,15 @@ var _ = Describe("Cosign test", Ordered, func() {
 			logrus.Info(string(output))
 
 			startIndex := strings.Index(string(output), "[")
-			if startIndex == -1 {
-				// Handle error: JSON start not found
-				return
-			}
+			Expect(startIndex).NotTo(Equal(-1), "JSON start - '[' not found")
+
 			jsonStr := string(output[startIndex:])
 
-			var verificationOutput CosignVerificationOutput
-			err = json.Unmarshal([]byte(jsonStr), &verificationOutput)
+			var cosignVerifyOutput testsupport.CosignVerifyOutput
+			err = json.Unmarshal([]byte(jsonStr), &cosignVerifyOutput)
 			Expect(err).ToNot(HaveOccurred())
 
-			logIndex = verificationOutput[0].Optional.Bundle.Payload.LogIndex
+			logIndex = cosignVerifyOutput[0].Optional.Bundle.Payload.LogIndex
 		})
 	})
 
@@ -154,28 +127,29 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 			logrus.Info(string(output))
 
+			// Look for JSON start
 			startIndex := strings.Index(string(output), "{")
-			if startIndex == -1 {
-				// Handle error: JSON start not found
-				return
-			}
+			Expect(startIndex).NotTo(Equal(-1), "JSON start - '{' not found")
+
 			jsonStr := string(output[startIndex:])
 
-			var result RekorCLIOutput
-			err = json.Unmarshal([]byte(jsonStr), &result)
+			var rekorGetOutput testsupport.RekorCLIGetOutput
+			err = json.Unmarshal([]byte(jsonStr), &rekorGetOutput)
 			Expect(err).ToNot(HaveOccurred())
 
-			signatureContent := result.HashedRekordObj.Signature.Content
-			publicKeyContent := result.HashedRekordObj.Signature.PublicKey.Content
-			hashValue = result.HashedRekordObj.Data.Hash.Value
+			// Extract values from rekor-cli get output
+			signatureContent := rekorGetOutput.HashedRekordObj.Signature.Content
+			publicKeyContent := rekorGetOutput.HashedRekordObj.Signature.PublicKey.Content
+			hashValue = rekorGetOutput.HashedRekordObj.Data.Hash.Value
 
+			// Decode signatureContent and publicKeyContent from base64
 			decodedSignatureContent, err := base64.StdEncoding.DecodeString(signatureContent)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Decode publicKeyContent from base64
 			decodedPublicKeyContent, err := base64.StdEncoding.DecodeString(publicKeyContent)
 			Expect(err).ToNot(HaveOccurred())
 
+			// Create files in the tempDir
 			publicKeyPath = filepath.Join(tempDir, "publickey.pem")
 			signaturePath = filepath.Join(tempDir, "signature.bin")
 

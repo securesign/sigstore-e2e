@@ -24,28 +24,6 @@ var dirFilePath string
 var tarFilePath string
 var signatureFilePath string
 
-type rekorCliVerifyOutput struct {
-	RekorHash  string
-	EntryIndex int
-}
-
-type RekorCLIOutput struct {
-	RekordObj struct {
-		Data struct {
-			Hash struct {
-				Algorithm string `json:"algorithm"`
-				Value     string `json:"value"`
-			} `json:"hash"`
-		} `json:"data"`
-		Signature struct {
-			Content   string `json:"content"`
-			PublicKey struct {
-				Content string `json:"content"`
-			} `json:"publicKey"`
-		} `json:"signature"`
-	} `json:"RekordObj"`
-}
-
 var _ = Describe("Verify entries, query the transparency log for inclusion proof", Ordered, func() {
 
 	var (
@@ -72,7 +50,7 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			}
 		})
 
-		// create directory and tar it
+		// tempDir for tarball and signature
 		tempDir, err = os.MkdirTemp("", "rekorTest")
 		Expect(err).ToNot(HaveOccurred())
 
@@ -109,10 +87,11 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			Expect(rekorCli.Command(testsupport.TestContext, "upload", "--rekor_server", rekorServerURL, "--signature", signatureFilePath, "--pki-format=x509", "--public-key", rekorKey, "--artifact", tarFilePath).Run()).To(Succeed())
 		})
 	})
+
 	Describe("Verify upload", func() {
 		It("should verify uploaded artifact", func() {
-			parseOutput := func(output string) rekorCliVerifyOutput {
-				var result rekorCliVerifyOutput
+			parseOutput := func(output string) testsupport.RekorCLIVerifyOutput {
+				var rekorVerifyOutput testsupport.RekorCLIVerifyOutput
 				lines := strings.Split(output, "\n")
 				for _, line := range lines {
 					if line == "" {
@@ -124,19 +103,19 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 						value := strings.TrimSpace(fields[1])
 						switch key {
 						case "Entry Hash":
-							result.RekorHash = value
+							rekorVerifyOutput.RekorHash = value
 						case "Entry Index":
 							entryIndex, err := strconv.Atoi(value)
 							if err != nil {
 								// Handle error
 								fmt.Println("Error converting Entry Index to int:", err)
-								return result
+								return rekorVerifyOutput
 							}
-							result.EntryIndex = entryIndex
+							rekorVerifyOutput.EntryIndex = entryIndex
 						}
 					}
 				}
-				return result
+				return rekorVerifyOutput
 			}
 
 			rekorServerURL := api.GetValueFor(api.RekorURL)
@@ -148,17 +127,15 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			verifyOutput := parseOutput(outputString)
 			rekorHash = verifyOutput.RekorHash
 			entryIndex = verifyOutput.EntryIndex
-
 		})
 	})
+
 	Describe("Get with UUID", func() {
 		It("should get data from rekor server", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 			Expect(rekorCli.Command(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--uuid", rekorHash).Run()).To(Succeed()) // UUID = Entry Hash here
 			Expect(err).ToNot(HaveOccurred())
-
 		})
-
 	})
 
 	Describe("Get with logindex", func() {
@@ -171,18 +148,19 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			Expect(err).ToNot(HaveOccurred())
 
 			logrus.Info(string(output))
+
+			// Look for JSON start
 			startIndex := strings.Index(string(output), "{")
-			if startIndex == -1 {
-				// Handle error: JSON start not found
-				return
-			}
+			Expect(startIndex).NotTo(Equal(-1), "JSON start - '{' not found")
+
 			jsonStr := string(output[startIndex:])
-			var result RekorCLIOutput
-			err = json.Unmarshal([]byte(jsonStr), &result)
+
+			var rekorGetOutput testsupport.RekorCLIGetOutput
+			err = json.Unmarshal([]byte(jsonStr), &rekorGetOutput)
 			Expect(err).ToNot(HaveOccurred())
 
 			// algorithm:hashValue
-			hashWithAlg = result.RekordObj.Data.Hash.Algorithm + ":" + result.RekordObj.Data.Hash.Value
+			hashWithAlg = rekorGetOutput.RekordObj.Data.Hash.Algorithm + ":" + rekorGetOutput.RekordObj.Data.Hash.Value
 		})
 	})
 
