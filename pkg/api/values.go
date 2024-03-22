@@ -24,7 +24,7 @@ var Values *viper.Viper
 func init() {
 	Values = viper.New()
 
-	Values.SetDefault(OidcRealm, "sigstore")
+	Values.SetDefault(OidcRealm, "trusted-artifact-signer")
 	Values.SetDefault(GithubUsername, "ignore")
 	Values.SetDefault(GithubOwner, "securesign")
 	Values.SetDefault(GithubRepo, "e2e-gitsign-test")
