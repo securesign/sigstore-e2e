@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestCosignTest(t *testing.T) {
+func TestRekorCliE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Make and verify entries, query the log for inclusion proof, integrity verification of the log or retrieval of entries")
 }
