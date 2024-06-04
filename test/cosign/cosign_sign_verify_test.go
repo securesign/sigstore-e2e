@@ -173,7 +173,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 	Describe("cosign attest", func() {
 		It("should create a predicate.json file", func() {
-			predicateJsonContent := `{
+			predicateJSONContent := `{
 				"builder": {
 					"id": "https://localhost/dummy-id"
 				},
@@ -193,7 +193,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 			predicatePath = filepath.Join(tempDir, "predicate.json")
 
-			Expect(os.WriteFile(predicatePath, []byte(predicateJsonContent), 0600)).To(Succeed())
+			Expect(os.WriteFile(predicatePath, []byte(predicateJSONContent), 0600)).To(Succeed())
 		})
 
 		It("should sign and attach the predicate as an attestation to the image", func() {
@@ -265,7 +265,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 			}
 
 			for _, pattern := range successPatterns {
-				Expect(pattern.MatchString(string(output))).To(BeTrue(), "Expected to find success message matching: %s", pattern.String())
+				Expect(pattern.Match(output)).To(BeTrue(), "Expected to find success message matching: %s", pattern.String())
 			}
 
 		})
