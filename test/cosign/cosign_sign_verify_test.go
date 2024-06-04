@@ -242,8 +242,8 @@ var _ = Describe("Cosign test", Ordered, func() {
 				}
 			}
 
-			Expect(hasAttestation).To(BeTrue(), "Expected the image to have at least one attestation with SHA entry")
-			Expect(hasSignature).To(BeTrue(), "Expected the image to have at least one signature with SHA entry")
+			Expect(hasAttestation).To(BeTrue(), "Expected the image to have at least one attestation")
+			Expect(hasSignature).To(BeTrue(), "Expected the image to have at least one signature")
 		})
 	})
 
