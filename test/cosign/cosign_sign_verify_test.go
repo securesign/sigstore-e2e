@@ -209,7 +209,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 	})
 
 	Describe("cosign tree", func() {
-		It("should verify that the container image has atleast one attestation and signature", func() {
+		It("should verify that the container image has at least one attestation and signature", func() {
 			output, err := cosign.CommandOutput(testsupport.TestContext, "tree", targetImageName)
 			Expect(err).ToNot(HaveOccurred())
 
