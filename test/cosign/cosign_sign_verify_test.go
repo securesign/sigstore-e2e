@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ var hashValue string
 var tempDir string
 var publicKeyPath string
 var signaturePath string
+var predicatePath string
 
 var _ = Describe("Cosign test", Ordered, func() {
 
@@ -37,6 +39,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 		dockerCli *client.Client
 		cosign    *clients.Cosign
 		rekorCli  *clients.RekorCli
+		ec        *clients.EnterpriseContract
 	)
 	targetImageName := "ttl.sh/" + uuid.New().String() + ":5m"
 
@@ -50,7 +53,9 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 		rekorCli = clients.NewRekorCli()
 
-		Expect(testsupport.InstallPrerequisites(cosign, rekorCli)).To(Succeed())
+		ec = clients.NewEnterpriseContract()
+
+		Expect(testsupport.InstallPrerequisites(cosign, rekorCli, ec)).To(Succeed())
 
 		DeferCleanup(func() {
 			if err := testsupport.DestroyPrerequisites(); err != nil {
@@ -59,7 +64,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 		})
 
 		// tempDir for publickey and signature
-		tempDir, err = os.MkdirTemp("", "rekorTest")
+		tempDir, err = os.MkdirTemp("", "tmp")
 		Expect(err).ToNot(HaveOccurred())
 
 		dockerCli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -117,8 +122,8 @@ var _ = Describe("Cosign test", Ordered, func() {
 		})
 	})
 
-	Describe("rekor-cli get with logIndex", func() {
-		It("should retrieve the entry from Rekor", func() {
+	Describe("rekor-cli get (via --log-index)", func() {
+		It("should retrieve the entry from Rekor and create public-key and signature files", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 			logIndexStr := strconv.Itoa(logIndex)
 
@@ -158,11 +163,111 @@ var _ = Describe("Cosign test", Ordered, func() {
 		})
 	})
 
-	Describe("rekor-cli verify artifact", func() {
+	Describe("rekor-cli verify", func() {
 		It("should verify the artifact using rekor-cli", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 
 			Expect(rekorCli.Command(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", signaturePath, "--public-key", publicKeyPath, "--pki-format", "x509", "--type", "hashedrekord:0.0.1", "--artifact-hash", hashValue).Run()).To(Succeed())
+		})
+	})
+
+	Describe("cosign attest", func() {
+		It("should create a predicate.json file", func() {
+			predicateJSONContent := `{
+				"builder": {
+					"id": "https://localhost/dummy-id"
+				},
+				"buildType": "https://example.com/tekton-pipeline",
+				"invocation": {},
+				"buildConfig": {},
+				"metadata": {
+					"completeness": {
+						"parameters": false,
+						"environment": false,
+						"materials": false
+					},
+					"reproducible": false
+				},
+				"materials": []
+			}`
+
+			predicatePath = filepath.Join(tempDir, "predicate.json")
+
+			Expect(os.WriteFile(predicatePath, []byte(predicateJSONContent), 0600)).To(Succeed())
+		})
+
+		It("should sign and attach the predicate as an attestation to the image", func() {
+			fulcioURL := api.GetValueFor(api.FulcioURL)
+			rekorServerURL := api.GetValueFor(api.RekorURL)
+			oidcIssuerURL := api.GetValueFor(api.OidcIssuerURL)
+
+			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.GetValueFor(api.OidcIssuerURL), "jdoe", "secure", api.GetValueFor(api.OidcRealm))
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(cosign.Command(testsupport.TestContext, "attest", "-y", "--identity-token="+token, "--fulcio-url="+fulcioURL, "--rekor-url="+rekorServerURL, "--oidc-issuer="+oidcIssuerURL, "--predicate", predicatePath, "--type", "slsaprovenance", targetImageName).Run()).To(Succeed())
+		})
+	})
+
+	Describe("cosign tree", func() {
+		It("should verify that the container image has at least one attestation and signature", func() {
+			output, err := cosign.CommandOutput(testsupport.TestContext, "tree", targetImageName)
+			Expect(err).ToNot(HaveOccurred())
+
+			logrus.Info(string(output))
+
+			// Matching (generic) hash entries
+			hashPattern := regexp.MustCompile(`└── 🍒 \w+:[0-9a-f]{64}`)
+
+			lines := strings.Split(string(output), "\n")
+			inSignatureSection := false
+			inAttestationSection := false
+			hasSignature := false
+			hasAttestation := false
+
+			for _, line := range lines {
+				if strings.Contains(line, "Signatures for an image tag:") {
+					inSignatureSection = true
+					inAttestationSection = false
+					continue
+				} else if strings.Contains(line, "Attestations for an image tag:") {
+					inSignatureSection = false
+					inAttestationSection = true
+					continue
+				}
+
+				if inSignatureSection && hashPattern.MatchString(line) {
+					hasSignature = true
+				} else if inAttestationSection && hashPattern.MatchString(line) {
+					hasAttestation = true
+				}
+			}
+
+			Expect(hasAttestation).To(BeTrue(), "Expected the image to have at least one attestation")
+			Expect(hasSignature).To(BeTrue(), "Expected the image to have at least one signature")
+		})
+	})
+
+	Describe("ec validate", func() {
+		It("should verify signature and attestation of the image", func() {
+			output, err := ec.CommandOutput(testsupport.TestContext, "validate", "image", "--image", targetImageName, "--certificate-identity-regexp", ".*@redhat", "--certificate-oidc-issuer-regexp", ".*keycloak.*", "--output", "yaml", "--show-successes")
+			Expect(err).ToNot(HaveOccurred())
+
+			logrus.Info(string(output))
+
+			successPatterns := []*regexp.Regexp{
+				regexp.MustCompile(`success: true\s+successes:`),
+				regexp.MustCompile(`metadata:\s+code: builtin.attestation.signature_check\s+msg: Pass`),
+				regexp.MustCompile(`metadata:\s+code: builtin.attestation.syntax_check\s+msg: Pass`),
+				regexp.MustCompile(`metadata:\s+code: builtin.image.signature_check\s+msg: Pass`),
+				regexp.MustCompile(`ec-version:`),
+				regexp.MustCompile(`effective-time:`),
+				regexp.MustCompile(`key: ""\s+policy: {}\s+success: true`),
+			}
+
+			for _, pattern := range successPatterns {
+				Expect(pattern.Match(output)).To(BeTrue(), "Expected to find success message matching: %s", pattern.String())
+			}
+
 		})
 	})
 })
