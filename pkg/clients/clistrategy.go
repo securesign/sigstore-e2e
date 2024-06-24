@@ -57,7 +57,7 @@ func DownloadFromOpenshift() SetupStrategy {
 	return func(ctx context.Context, c *cli) (string, error) {
 		logrus.Info("Getting binary '", c.Name, "' from Openshift")
 		// Get http link
-		link, err := kubernetes.ConsoleCLIDownload(ctx, c.Name, runtime.GOOS)
+		link, err := kubernetes.ConsoleCLIDownload(ctx, c.Name, runtime.GOOS, runtime.GOARCH)
 		if err != nil {
 			return "", err
 		}
@@ -68,7 +68,13 @@ func DownloadFromOpenshift() SetupStrategy {
 		}
 
 		logrus.Info("Downloading ", c.Name, " from ", link)
-		fileName := tmp + string(os.PathSeparator) + c.Name
+
+		var fileName string
+		if runtime.GOOS == "windows" {
+			fileName = filepath.Join(tmp, c.Name+".exe")
+		} else {
+			fileName = filepath.Join(tmp, c.Name)
+		}
 		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711)
 		if err != nil {
 			return "", err
