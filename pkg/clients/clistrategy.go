@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -17,8 +18,11 @@ import (
 	"github.com/securesign/sigstore-e2e/pkg/api"
 	"github.com/securesign/sigstore-e2e/pkg/kubernetes"
 	"github.com/securesign/sigstore-e2e/pkg/support"
+	"github.com/securesign/sigstore-e2e/test/testsupport"
 	"github.com/sirupsen/logrus"
 )
+
+var ErrNotFound = errors.New("executable file not found in WSL")
 
 func PreferredSetupStrategy() SetupStrategy {
 	var preferredStrategy SetupStrategy
@@ -82,8 +86,31 @@ func DownloadFromOpenshift() SetupStrategy {
 func LocalBinary() SetupStrategy {
 	return func(ctx context.Context, c *cli) (string, error) {
 		logrus.Info("Checking local binary '", c.Name, "'")
-		return exec.LookPath(c.Name)
+		if runtime.GOOS == "windows" && c.Name == "skopeo" {
+			logrus.Info("Checking local '", c.Name, "'")
+			return LookPathInWSL(c)
+		} else {
+			return exec.LookPath(c.Name)
+		}
 	}
+}
+
+func LookPathInWSL(c *cli) (string, error) {
+	if !testsupport.IsWSLAvailable() {
+		return "", &exec.Error{Name: c.Name, Err: exec.ErrNotFound}
+	}
+
+	cmd := exec.Command("wsl", "which", c.Name)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", &exec.Error{Name: c.Name, Err: err}
+	}
+	path := strings.TrimSpace(string(output))
+	if path == "" {
+		return "", &exec.Error{Name: c.Name, Err: ErrNotFound}
+	}
+	logrus.Infof("Found '%s' in WSL: %s", c.Name, path)
+	return path, nil
 }
 
 func ExtractFromContainer(image string, path string) SetupStrategy {

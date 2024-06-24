@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/sirupsen/logrus"
 )
@@ -28,7 +29,18 @@ func (c *Gitsign) GitWithGitSign(ctx context.Context, workdir string, signToken 
 	if err != nil {
 		return err
 	}
-	cmd.Env = append(cmd.Env, fmt.Sprintf("SIGSTORE_ID_TOKEN=%s", signToken), "PATH="+filepath.Dir(c.pathToCLI)+":"+filepath.Dir(gitPath))
+
+	var pathSeparator string
+	switch runtime.GOOS {
+	case "windows": // semicolon for Windows
+		pathSeparator = ";"
+	case "linux", "darwin": // colon for Linux and macOS
+		pathSeparator = ":"
+	default:
+		logrus.Fatal("Unsupported OS: " + runtime.GOOS)
+	}
+
+	cmd.Env = append(cmd.Env, fmt.Sprintf("SIGSTORE_ID_TOKEN=%s", signToken), "PATH="+filepath.Dir(c.pathToCLI)+pathSeparator+filepath.Dir(gitPath))
 	cmd.Dir = workdir
 	cmd.Stdout = logrus.NewEntry(logrus.StandardLogger()).WithField("app", "git").WriterLevel(logrus.InfoLevel)
 	cmd.Stderr = logrus.NewEntry(logrus.StandardLogger()).WithField("app", "git").WriterLevel(logrus.ErrorLevel)
