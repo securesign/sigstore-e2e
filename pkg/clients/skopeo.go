@@ -22,7 +22,7 @@ func NewSkopeo() *Skopeo {
 
 func (c *cli) WSLCommand(ctx context.Context, args ...string) *exec.Cmd {
 	wslArgs := append([]string{"skopeo"}, args...)
-	cmd := exec.CommandContext(ctx, "wsl", wslArgs...) // #nosec G204 - we don't expect the code to be running on PROD ENV
+	cmd := exec.CommandContext(ctx, "wsl", wslArgs...)
 
 	cmd.Stdout = logrus.NewEntry(logrus.StandardLogger()).WithField("app", c.Name).WriterLevel(logrus.InfoLevel)
 	cmd.Stderr = logrus.NewEntry(logrus.StandardLogger()).WithField("app", c.Name).WriterLevel(logrus.ErrorLevel)

@@ -93,29 +93,35 @@ func LocalBinary() SetupStrategy {
 	return func(ctx context.Context, c *cli) (string, error) {
 		logrus.Info("Checking local binary '", c.Name, "'")
 		if runtime.GOOS == "windows" && c.Name == "skopeo" {
-			logrus.Info("Checking local '", c.Name, "'")
-			return LookPathInWSL(c)
+			return LookPathInWSL(c.Name)
 		} else {
 			return exec.LookPath(c.Name)
 		}
 	}
 }
 
-func LookPathInWSL(c *cli) (string, error) {
+func LookPathInWSL(name string) (string, error) {
 	if !testsupport.IsWSLAvailable() {
-		return "", &exec.Error{Name: c.Name, Err: exec.ErrNotFound}
+		logrus.Fatal("WSL is not available")
+		return "", &exec.Error{Name: name, Err: exec.ErrNotFound}
 	}
+	logrus.Info("WSL is available")
 
-	cmd := exec.Command("wsl", "which", c.Name)
+	cmd := exec.Command("wsl", "which", name)
 	output, err := cmd.Output()
 	if err != nil {
-		return "", &exec.Error{Name: c.Name, Err: err}
+		logrus.Errorf("Error executing command 'wsl which %s': %v", name, err)
+		return "", &exec.Error{Name: name, Err: err}
 	}
+	logrus.Infof("Command 'wsl which %s' executed successfully", name)
+
 	path := strings.TrimSpace(string(output))
+	logrus.Infof("Output from command 'wsl which %s': %s", name, path)
 	if path == "" {
-		return "", &exec.Error{Name: c.Name, Err: ErrNotFound}
+		logrus.Fatalf("'%s' not found in WSL: %s", name, path)
+		return "", &exec.Error{Name: name, Err: ErrNotFound}
 	}
-	logrus.Infof("Found '%s' in WSL: %s", c.Name, path)
+	logrus.Infof("Found '%s' in WSL: %s", name, path)
 	return path, nil
 }
 

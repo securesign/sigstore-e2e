@@ -13,6 +13,5 @@ func IsWSLAvailable() bool {
 		logrus.Warn("WSL is not available on this system: ", err)
 		return false
 	}
-	logrus.Info("WSL is available")
 	return true
 }
