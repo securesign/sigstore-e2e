@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -17,8 +18,11 @@ import (
 	"github.com/securesign/sigstore-e2e/pkg/api"
 	"github.com/securesign/sigstore-e2e/pkg/kubernetes"
 	"github.com/securesign/sigstore-e2e/pkg/support"
+	"github.com/securesign/sigstore-e2e/test/testsupport"
 	"github.com/sirupsen/logrus"
 )
+
+var ErrNotFound = errors.New("executable file not found in WSL")
 
 func PreferredSetupStrategy() SetupStrategy {
 	var preferredStrategy SetupStrategy
@@ -53,7 +57,7 @@ func DownloadFromOpenshift() SetupStrategy {
 	return func(ctx context.Context, c *cli) (string, error) {
 		logrus.Info("Getting binary '", c.Name, "' from Openshift")
 		// Get http link
-		link, err := kubernetes.ConsoleCLIDownload(ctx, c.Name, runtime.GOOS)
+		link, err := kubernetes.ConsoleCLIDownload(ctx, c.Name, runtime.GOOS, runtime.GOARCH)
 		if err != nil {
 			return "", err
 		}
@@ -64,7 +68,13 @@ func DownloadFromOpenshift() SetupStrategy {
 		}
 
 		logrus.Info("Downloading ", c.Name, " from ", link)
-		fileName := tmp + string(os.PathSeparator) + c.Name
+
+		var fileName string
+		if runtime.GOOS == "windows" {
+			fileName = filepath.Join(tmp, c.Name+".exe")
+		} else {
+			fileName = filepath.Join(tmp, c.Name)
+		}
 		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711)
 		if err != nil {
 			return "", err
@@ -82,8 +92,39 @@ func DownloadFromOpenshift() SetupStrategy {
 func LocalBinary() SetupStrategy {
 	return func(ctx context.Context, c *cli) (string, error) {
 		logrus.Info("Checking local binary '", c.Name, "'")
-		return exec.LookPath(c.Name)
+		if runtime.GOOS == "windows" && c.Name == "skopeo" {
+			logrus.Info("Checking local '", c.Name, "'")
+			return LookPathInWSL(c.Name)
+		} else {
+
+			return exec.LookPath(c.Name)
+		}
 	}
+}
+
+func LookPathInWSL(name string) (string, error) {
+	if !testsupport.IsWSLAvailable() {
+		logrus.Fatal("WSL is not available")
+		return "", &exec.Error{Name: name, Err: exec.ErrNotFound}
+	}
+	logrus.Info("WSL is available")
+
+	cmd := exec.Command("wsl", "which", name)
+	output, err := cmd.Output()
+	if err != nil {
+		logrus.Errorf("Error executing command 'wsl which %s': %v", name, err)
+		return "", &exec.Error{Name: name, Err: err}
+	}
+	logrus.Infof("Command 'wsl which %s' executed successfully", name)
+
+	path := strings.TrimSpace(string(output))
+	logrus.Infof("Output from command 'wsl which %s': %s", name, path)
+	if path == "" {
+		logrus.Fatalf("'%s' not found in WSL: %s", name, path)
+		return "", &exec.Error{Name: name, Err: ErrNotFound}
+	}
+	logrus.Infof("Found '%s' in WSL: %s", name, path)
+	return path, nil
 }
 
 func ExtractFromContainer(image string, path string) SetupStrategy {
