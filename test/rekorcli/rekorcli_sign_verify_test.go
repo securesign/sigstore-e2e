@@ -122,7 +122,6 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			rekorKey := "ec_public.pem"
 			output, err := rekorCli.CommandOutput(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", signatureFilePath, "--pki-format=x509", "--public-key", rekorKey, "--artifact", tarFilePath)
 			Expect(err).ToNot(HaveOccurred())
-			logrus.Info(string(output))
 			outputString := string(output)
 			verifyOutput := parseOutput(outputString)
 			rekorHash = verifyOutput.RekorHash
@@ -146,8 +145,6 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			// extrract of hash value for searching with --sha
 			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", entryIndexStr)
 			Expect(err).ToNot(HaveOccurred())
-
-			logrus.Info(string(output))
 
 			// Look for JSON start
 			startIndex := strings.Index(string(output), "{")
