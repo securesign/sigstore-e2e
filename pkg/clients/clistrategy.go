@@ -18,7 +18,6 @@ import (
 	"github.com/securesign/sigstore-e2e/pkg/api"
 	"github.com/securesign/sigstore-e2e/pkg/kubernetes"
 	"github.com/securesign/sigstore-e2e/pkg/support"
-	"github.com/securesign/sigstore-e2e/test/testsupport"
 	"github.com/sirupsen/logrus"
 )
 
@@ -103,12 +102,6 @@ func LocalBinary() SetupStrategy {
 }
 
 func LookPathInWSL(name string) (string, error) {
-	if !testsupport.IsWSLAvailable() {
-		logrus.Fatal("WSL is not available")
-		return "", &exec.Error{Name: name, Err: exec.ErrNotFound}
-	}
-	logrus.Info("WSL is available")
-
 	cmd := exec.Command("wsl", "which", name)
 	output, err := cmd.Output()
 	if err != nil {
@@ -118,7 +111,6 @@ func LookPathInWSL(name string) (string, error) {
 	logrus.Infof("Command 'wsl which %s' executed successfully", name)
 
 	path := strings.TrimSpace(string(output))
-	logrus.Infof("Output from command 'wsl which %s': %s", name, path)
 	if path == "" {
 		logrus.Fatalf("'%s' not found in WSL: %s", name, path)
 		return "", &exec.Error{Name: name, Err: ErrNotFound}
