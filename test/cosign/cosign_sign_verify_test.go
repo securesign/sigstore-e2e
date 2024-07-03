@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -15,7 +14,6 @@ import (
 	"github.com/securesign/sigstore-e2e/pkg/clients"
 	"github.com/securesign/sigstore-e2e/test/testsupport"
 
-	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
@@ -37,7 +35,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 		rekorCli *clients.RekorCli
 		ec       *clients.EnterpriseContract
 	)
-	targetImageName := "ttl.sh/" + uuid.New().String() + ":5m"
+	targetImageName := "ttl.sh/kdacosta-e2e-test:1h"
 
 	BeforeAll(func() {
 		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm)
@@ -65,17 +63,6 @@ var _ = Describe("Cosign test", Ordered, func() {
 		tempDir, err = os.MkdirTemp("", "tmp")
 		Expect(err).ToNot(HaveOccurred())
 
-		// Use Skopeo to copy the image from Docker Hub to ttl.sh registry
-		switch runtime.GOOS {
-		case "darwin":
-			Expect(skopeo.Command(testsupport.TestContext, "copy", "--override-os", "linux", "--override-arch", "amd64", "docker://docker.io/library/alpine:latest", "docker://"+targetImageName).Run()).To(Succeed())
-		case "linux":
-			Expect(skopeo.Command(testsupport.TestContext, "copy", "docker://docker.io/library/alpine:latest", "docker://"+targetImageName).Run()).To(Succeed())
-		case "windows": // (using WSL)
-			Expect(skopeo.WSLCommand(testsupport.TestContext, "copy", "docker://docker.io/library/alpine:latest", "docker://"+targetImageName).Run()).To(Succeed())
-		default:
-			logrus.Fatal("Unsupported platform: " + runtime.GOOS)
-		}
 		// wait for a while to be sure that the image landed in the registry
 		time.Sleep(10 * time.Second)
 	})
