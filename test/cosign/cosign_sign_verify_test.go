@@ -30,7 +30,6 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 	var (
 		err      error
-		skopeo   *clients.Skopeo
 		cosign   *clients.Cosign
 		rekorCli *clients.RekorCli
 		ec       *clients.EnterpriseContract
@@ -49,9 +48,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 		ec = clients.NewEnterpriseContract()
 
-		skopeo = clients.NewSkopeo()
-
-		Expect(testsupport.InstallPrerequisites(cosign, rekorCli, ec, skopeo)).To(Succeed())
+		Expect(testsupport.InstallPrerequisites(cosign, rekorCli, ec)).To(Succeed())
 
 		DeferCleanup(func() {
 			if err := testsupport.DestroyPrerequisites(); err != nil {
