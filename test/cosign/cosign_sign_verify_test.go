@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/securesign/sigstore-e2e/pkg/api"
 	"github.com/securesign/sigstore-e2e/pkg/clients"
@@ -25,6 +24,7 @@ var tempDir string
 var publicKeyPath string
 var signaturePath string
 var predicatePath string
+var targetImageName string
 
 var _ = Describe("Cosign test", Ordered, func() {
 
@@ -34,7 +34,6 @@ var _ = Describe("Cosign test", Ordered, func() {
 		rekorCli *clients.RekorCli
 		ec       *clients.EnterpriseContract
 	)
-	targetImageName := "ttl.sh/kdacosta-e2e-test:1h"
 
 	BeforeAll(func() {
 		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm)
@@ -60,8 +59,8 @@ var _ = Describe("Cosign test", Ordered, func() {
 		tempDir, err = os.MkdirTemp("", "tmp")
 		Expect(err).ToNot(HaveOccurred())
 
-		// wait for a while to be sure that the image landed in the registry
-		time.Sleep(10 * time.Second)
+		targetImageName = os.Getenv("TARGET_IMAGE_NAME")
+		Expect(targetImageName).NotTo(BeEmpty(), "TARGET_IMAGE_NAME environment variable must be set")
 	})
 
 	Describe("Cosign initialize", func() {
