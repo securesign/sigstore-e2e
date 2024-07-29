@@ -2,13 +2,20 @@ package rekor_search_UI
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
-	"github.com/securesign/sigstore-e2e/pkg/clients"
-	"github.com/ysmood/got"
+
 	//. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	"github.com/securesign/sigstore-e2e/pkg/api"
+	"github.com/securesign/sigstore-e2e/pkg/clients"
+	"github.com/securesign/sigstore-e2e/test/testsupport"
+	"github.com/sirupsen/logrus"
+	"github.com/ysmood/got"
 )
 
 type G struct {
@@ -25,47 +32,51 @@ var (
 	rekorCli *clients.RekorCli
 )
 var RekorHash string
+var hashWithAlg string
+var entryIndex int
 
 // helper function for stack values
-// var helper = func() {
-// 	parseOutput := func(output string) testsupport.RekorCLIVerifyOutput {
-// 		var rekorVerifyOutput testsupport.RekorCLIVerifyOutput
-// 		lines := strings.Split(output, "\n")
-// 		for _, line := range lines {
-// 			if line == "" {
-// 				continue // Skip empty lines
-// 			}
-// 			fields := strings.SplitN(line, ": ", 2) // Split by ": "
-// 			if len(fields) == 2 {
-// 				key := strings.TrimSpace(fields[0])
-// 				value := strings.TrimSpace(fields[1])
-// 				switch key {
-// 				case "Entry Hash":
-// 					rekorVerifyOutput.RekorHash = value
-// 				case "Entry Index":
-// 					entryIndex, err := strconv.Atoi(value)
-// 					if err != nil {
-// 						// Handle error
-// 						fmt.Println("Error converting Entry Index to int:", err)
-// 						return rekorVerifyOutput
-// 					}
-// 					rekorVerifyOutput.EntryIndex = entryIndex
-// 				}
-// 			}
-// 		}
-// 		return rekorVerifyOutput
-// 	}
-// 	rekorServerURL := api.GetValueFor(api.RekorURL)
-// 	rekorKey := "ec_public.pem"
-// 	output, err := rekorCli.CommandOutput(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--pki-format=x509", "--public-key", rekorKey)
-// 	Expect(err).ToNot(HaveOccurred())
-// 	logrus.Info(string(output))
-// 	outputString := string(output)
-// 	verifyOutput := parseOutput(outputString)
-// 	RekorHash = "adsasdd"
-// 	entryIndex = verifyOutput.EntryIndex
+var helper = func() {
+	parseOutput := func(output string) testsupport.RekorCLIVerifyOutput {
+		var rekorVerifyOutput testsupport.RekorCLIVerifyOutput
+		lines := strings.Split(output, "\n")
+		for _, line := range lines {
+			if line == "" {
+				continue // Skip empty lines
+			}
+			fields := strings.SplitN(line, ": ", 2) // Split by ": "
+			if len(fields) == 2 {
+				key := strings.TrimSpace(fields[0])
+				value := strings.TrimSpace(fields[1])
+				switch key {
+				case "Entry Hash":
+					rekorVerifyOutput.RekorHash = value
+				case "Entry Index":
+					entryIndex, err := strconv.Atoi(value)
+					if err != nil {
+						// Handle error
+						fmt.Println("Error converting Entry Index to int:", err)
+						return rekorVerifyOutput
+					}
+					rekorVerifyOutput.EntryIndex = entryIndex
+				}
+			}
+		}
+		return rekorVerifyOutput
+	}
+	rekorServerURL := api.GetValueFor(api.RekorURL)
+	rekorKey := "ec_public.pem"
+	output, err := rekorCli.CommandOutput(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--pki-format=x509", "--public-key", rekorKey)
+	Expect(err).ToNot(HaveOccurred())
+	logrus.Info(string(output))
+	outputString := string(output)
+	verifyOutput := parseOutput(outputString)
+	RekorHash = "adsasdd"
+	entryIndex = verifyOutput.EntryIndex
+	var rekorGetOutput testsupport.RekorCLIGetOutput
+	hashWithAlg = rekorGetOutput.RekordObj.Data.Hash.Algorithm + ":" + rekorGetOutput.RekordObj.Data.Hash.Value
 
-// }
+}
 
 var setup = func() func(t *testing.T) G {
 	return func(t *testing.T) G {
@@ -121,7 +132,7 @@ func TestEmail(t *testing.T) {
 
 // test for Hash
 func TestHash(t *testing.T) {
-	h := helping{hashWithAlg: "1234567890abcdef"}
+	// h := helping{hashWithAlg: "1234567890abcdef"}
 
 	//need to take hash from the stack so I can test it in UI
 
@@ -139,12 +150,12 @@ func TestHash(t *testing.T) {
 
 	// fill the text field with the hash
 	hashInput := p.MustElement("#rekor-search-hash")
-	hashInput.MustWaitVisible().MustInput(h.hashWithAlg) //will be replaced with actual hash used for signing
+	hashInput.MustWaitVisible().MustInput(hashWithAlg) //will be replaced with actual hash used for signing
 	fmt.Println("came here5")
 
 	// verify the input value
 	inputValue := hashInput.MustProperty("value").String()
-	g.Eq(inputValue, h) //here we take the hash from stack
+	g.Eq(inputValue, hashWithAlg) //here we take the hash from stack
 	fmt.Println("came here6")
 
 	searchButton := p.MustElement("#search-form-button")
