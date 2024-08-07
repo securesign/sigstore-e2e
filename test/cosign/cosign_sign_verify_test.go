@@ -67,7 +67,6 @@ var _ = Describe("Cosign test", Ordered, func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		manualImageSetup := os.Getenv("MANUAL_IMAGE_SETUP") == "true"
-		logrus.Info(manualImageSetup)
 		if !manualImageSetup {
 			targetImageName = "ttl.sh/" + uuid.New().String() + ":5m"
 			dockerCli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
