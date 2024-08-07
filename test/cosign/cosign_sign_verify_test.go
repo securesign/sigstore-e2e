@@ -3,12 +3,16 @@ package cosign
 import (
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
+	"github.com/google/uuid"
 	"github.com/securesign/sigstore-e2e/pkg/api"
 	"github.com/securesign/sigstore-e2e/pkg/clients"
 	"github.com/securesign/sigstore-e2e/test/testsupport"
@@ -17,6 +21,8 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 )
+
+const testImage string = "alpine:latest"
 
 var logIndex int
 var hashValue string
@@ -29,10 +35,11 @@ var targetImageName string
 var _ = Describe("Cosign test", Ordered, func() {
 
 	var (
-		err      error
-		cosign   *clients.Cosign
-		rekorCli *clients.RekorCli
-		ec       *clients.EnterpriseContract
+		err       error
+		dockerCli *client.Client
+		cosign    *clients.Cosign
+		rekorCli  *clients.RekorCli
+		ec        *clients.EnterpriseContract
 	)
 
 	BeforeAll(func() {
@@ -59,8 +66,30 @@ var _ = Describe("Cosign test", Ordered, func() {
 		tempDir, err = os.MkdirTemp("", "tmp")
 		Expect(err).ToNot(HaveOccurred())
 
-		targetImageName = os.Getenv("TARGET_IMAGE_NAME")
-		Expect(targetImageName).NotTo(BeEmpty(), "TARGET_IMAGE_NAME environment variable must be set")
+		manualImageSetup := os.Getenv("MANUAL_IMAGE_SETUP") == "true"
+		if manualImageSetup {
+			targetImageName = "ttl.sh/" + uuid.New().String() + ":5m"
+			dockerCli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+			Expect(err).ToNot(HaveOccurred())
+
+			var pull io.ReadCloser
+			pull, err = dockerCli.ImagePull(testsupport.TestContext, testImage, types.ImagePullOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			_, err = io.Copy(os.Stdout, pull)
+			Expect(err).ToNot(HaveOccurred())
+			defer pull.Close()
+
+			Expect(dockerCli.ImageTag(testsupport.TestContext, testImage, targetImageName)).To(Succeed())
+			var push io.ReadCloser
+			push, err = dockerCli.ImagePush(testsupport.TestContext, targetImageName, types.ImagePushOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			_, err = io.Copy(os.Stdout, push)
+			Expect(err).ToNot(HaveOccurred())
+			defer push.Close()
+		} else {
+			targetImageName = os.Getenv("TARGET_IMAGE_NAME")
+			Expect(targetImageName).NotTo(BeEmpty(), "TARGET_IMAGE_NAME environment variable must be set")
+		}
 	})
 
 	Describe("Cosign initialize", func() {
