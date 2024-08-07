@@ -11,5 +11,3 @@ out/
 
 # MacOS
 .DS_Store
-
-tas-env-variables.sh
