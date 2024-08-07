@@ -91,32 +91,8 @@ func DownloadFromOpenshift() SetupStrategy {
 func LocalBinary() SetupStrategy {
 	return func(ctx context.Context, c *cli) (string, error) {
 		logrus.Info("Checking local binary '", c.Name, "'")
-		if runtime.GOOS == "windows" && c.Name == "skopeo" {
-			logrus.Info("Checking local '", c.Name, "'")
-			return LookPathInWSL(c.Name)
-		} else {
-
-			return exec.LookPath(c.Name)
-		}
+		return exec.LookPath(c.Name)
 	}
-}
-
-func LookPathInWSL(name string) (string, error) {
-	cmd := exec.Command("wsl", "which", name)
-	output, err := cmd.Output()
-	if err != nil {
-		logrus.Errorf("Error executing command 'wsl which %s': %v", name, err)
-		return "", &exec.Error{Name: name, Err: err}
-	}
-	logrus.Infof("Command 'wsl which %s' executed successfully", name)
-
-	path := strings.TrimSpace(string(output))
-	if path == "" {
-		logrus.Fatalf("'%s' not found in WSL: %s", name, path)
-		return "", &exec.Error{Name: name, Err: ErrNotFound}
-	}
-	logrus.Infof("Found '%s' in WSL: %s", name, path)
-	return path, nil
 }
 
 func ExtractFromContainer(image string, path string) SetupStrategy {

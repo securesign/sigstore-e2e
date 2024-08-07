@@ -3,7 +3,6 @@ package clients
 import (
 	"context"
 	"os/exec"
-	"runtime"
 
 	"github.com/sirupsen/logrus"
 )
@@ -51,11 +50,7 @@ func (c *cli) Setup(ctx context.Context) error {
 	if err == nil {
 		if c.versionCommand != "" {
 			logrus.Info("Done. Using '", c.pathToCLI, "' with version:")
-			if runtime.GOOS == "windows" && c.Name == "skopeo" {
-				_ = c.WSLCommand(ctx, c.versionCommand).Run()
-			} else {
-				_ = c.Command(ctx, c.versionCommand).Run()
-			}
+			_ = c.Command(ctx, c.versionCommand).Run()
 		}
 	} else {
 		logrus.Error("Failed due to\n   ", err)
