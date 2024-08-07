@@ -13,7 +13,6 @@ This test suite aims to cover Sigstore deployment with end-to-end (E2E) tests, p
 ## Prerequisites
 ### Required Tools
 
-- **[Skopeo](https://github.com/containers/skopeo):** Used for container image operations.  
 - **Trusted Artifact Signer (TAS):** For secure signing capabilities.  
 - **OpenShift Pipelines:** To support CI/CD workflows.  
 
@@ -32,29 +31,13 @@ export CLI_STRATEGY=openshift
 ```
 This configures the test suite to download `cosign`, `gitsign`, `rekor-cli`, and `ec` binaries from the cluster's console. If not set, the suite will use local binaries by default.
 
+- Optional: To use a manual image setup, set the `MANUAL_IMAGE_SETUP` environment variable to `true` and specify the `TARGET_IMAGE_NAME`. For daemonless runners, you can use tools like [skopeo](https://github.com/containers/skopeo).
+```
+export MANUAL_IMAGE_SETUP=true
+export TARGET_IMAGE_NAME="ttl.sh/$(uuidgen):10m"
+skopeo copy docker://docker.io/library/alpine:latest docker://$TARGET_IMAGE_NAME
+```
 ## Installation
-### Skopeo
-
-#### macOS
-Install via Homebrew:
-```
-brew install skopeo
-```
-
-#### Linux
-- Fedora/CentOS/RHEL:  
-```
-sudo dnf install skopeo
-```
-- Ubuntu/Debian:  
-```
-sudo apt install skopeo
-```
-
-#### Windows
-- Install via Windows Subsystem for Linux (WSL) (see Linux instructions above)
-
-
 #### Trusted Artifact Signer (TAS)
 Options:
 
