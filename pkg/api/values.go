@@ -3,16 +3,18 @@ package api
 import "github.com/spf13/viper"
 
 const (
-	FulcioURL      = "SIGSTORE_FULCIO_URL"
-	RekorURL       = "SIGSTORE_REKOR_URL"
-	TufURL         = "TUF_URL"
-	OidcIssuerURL  = "SIGSTORE_OIDC_ISSUER"
-	OidcRealm      = "KEYCLOAK_REALM"
-	GithubToken    = "TEST_GITHUB_TOKEN" // #nosec G101: Potential hardcoded credentials (gosec)
-	GithubUsername = "TEST_GITHUB_USER"
-	GithubOwner    = "TEST_GITHUB_OWNER"
-	GithubRepo     = "TEST_GITHUB_REPO"
-	CliStrategy    = "CLI_STRATEGY"
+	FulcioURL        = "SIGSTORE_FULCIO_URL"
+	RekorURL         = "SIGSTORE_REKOR_URL"
+	TufURL           = "TUF_URL"
+	OidcIssuerURL    = "SIGSTORE_OIDC_ISSUER"
+	OidcRealm        = "KEYCLOAK_REALM"
+	GithubToken      = "TEST_GITHUB_TOKEN" // #nosec G101: Potential hardcoded credentials (gosec)
+	GithubUsername   = "TEST_GITHUB_USER"
+	GithubOwner      = "TEST_GITHUB_OWNER"
+	GithubRepo       = "TEST_GITHUB_REPO"
+	CliStrategy      = "CLI_STRATEGY"
+	ManualImageSetup = "MANUAL_IMAGE_SETUP"
+	TargetImageName  = "TARGET_IMAGE_NAME"
 
 	// 'DockerRegistry*' - Login credentials for 'registry.redhat.io'.
 	DockerRegistryUsername = "REGISTRY_USERNAME"
@@ -29,6 +31,7 @@ func init() {
 	Values.SetDefault(GithubOwner, "securesign")
 	Values.SetDefault(GithubRepo, "e2e-gitsign-test")
 	Values.SetDefault(CliStrategy, "local")
+	Values.SetDefault(ManualImageSetup, "false")
 	Values.AutomaticEnv()
 }
 
