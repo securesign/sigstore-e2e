@@ -66,7 +66,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 		tempDir, err = os.MkdirTemp("", "tmp")
 		Expect(err).ToNot(HaveOccurred())
 
-		manualImageSetup := os.Getenv("MANUAL_IMAGE_SETUP") == "true"
+		manualImageSetup := api.GetValueFor(api.ManualImageSetup) == "true"
 		if !manualImageSetup {
 			targetImageName = "ttl.sh/" + uuid.New().String() + ":5m"
 			dockerCli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -87,8 +87,8 @@ var _ = Describe("Cosign test", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 			defer push.Close()
 		} else {
-			targetImageName = os.Getenv("TARGET_IMAGE_NAME")
-			Expect(targetImageName).NotTo(BeEmpty(), "TARGET_IMAGE_NAME environment variable must be set")
+			targetImageName = api.GetValueFor(api.TargetImageName)
+			Expect(targetImageName).NotTo(BeEmpty(), "TARGET_IMAGE_NAME environment variable must be set when MANUAL_IMAGE_SETUP is true")
 		}
 	})
 

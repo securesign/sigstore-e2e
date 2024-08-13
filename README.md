@@ -8,7 +8,7 @@
 - [Notes](#notes)
   
 ## Overview
-This test suite aims to cover Sigstore deployment with end-to-end (E2E) tests, primarily focused on OpenShift deployment.
+This test suite aims to cover Trusted Artifact Signer deployment with end-to-end (E2E) tests, primarily focused on OpenShift deployment.
 
 ## Prerequisites
 ### Required Tools
