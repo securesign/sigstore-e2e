@@ -9,15 +9,14 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/securesign/sigstore-e2e/pkg/api"
-	"github.com/securesign/sigstore-e2e/pkg/clients"
-	"github.com/securesign/sigstore-e2e/test/testsupport"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
+	"github.com/securesign/sigstore-e2e/pkg/api"
+	"github.com/securesign/sigstore-e2e/pkg/clients"
+	"github.com/securesign/sigstore-e2e/test/testsupport"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
@@ -31,6 +30,7 @@ var tempDir string
 var publicKeyPath string
 var signaturePath string
 var predicatePath string
+var targetImageName string
 
 var _ = Describe("Cosign test", Ordered, func() {
 
@@ -41,7 +41,6 @@ var _ = Describe("Cosign test", Ordered, func() {
 		rekorCli  *clients.RekorCli
 		ec        *clients.EnterpriseContract
 	)
-	targetImageName := "ttl.sh/" + uuid.New().String() + ":5m"
 
 	BeforeAll(func() {
 		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm)
@@ -63,29 +62,34 @@ var _ = Describe("Cosign test", Ordered, func() {
 			}
 		})
 
-		// tempDir for publickey and signature
+		// tempDir for publickey, signature, and predicate files
 		tempDir, err = os.MkdirTemp("", "tmp")
 		Expect(err).ToNot(HaveOccurred())
 
-		dockerCli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-		Expect(err).ToNot(HaveOccurred())
+		manualImageSetup := api.GetValueFor(api.ManualImageSetup) == "true"
+		if !manualImageSetup {
+			targetImageName = "ttl.sh/" + uuid.New().String() + ":5m"
+			dockerCli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+			Expect(err).ToNot(HaveOccurred())
 
-		var pull io.ReadCloser
-		pull, err = dockerCli.ImagePull(testsupport.TestContext, testImage, types.ImagePullOptions{})
-		Expect(err).ToNot(HaveOccurred())
-		_, err = io.Copy(os.Stdout, pull)
-		Expect(err).ToNot(HaveOccurred())
-		defer pull.Close()
+			var pull io.ReadCloser
+			pull, err = dockerCli.ImagePull(testsupport.TestContext, testImage, types.ImagePullOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			_, err = io.Copy(os.Stdout, pull)
+			Expect(err).ToNot(HaveOccurred())
+			defer pull.Close()
 
-		Expect(dockerCli.ImageTag(testsupport.TestContext, testImage, targetImageName)).To(Succeed())
-		var push io.ReadCloser
-		push, err = dockerCli.ImagePush(testsupport.TestContext, targetImageName, types.ImagePushOptions{})
-		Expect(err).ToNot(HaveOccurred())
-		_, err = io.Copy(os.Stdout, push)
-		Expect(err).ToNot(HaveOccurred())
-		defer push.Close()
-		// wait for a while to be sure that the image landed in the registry
-		time.Sleep(10 * time.Second)
+			Expect(dockerCli.ImageTag(testsupport.TestContext, testImage, targetImageName)).To(Succeed())
+			var push io.ReadCloser
+			push, err = dockerCli.ImagePush(testsupport.TestContext, targetImageName, types.ImagePushOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			_, err = io.Copy(os.Stdout, push)
+			Expect(err).ToNot(HaveOccurred())
+			defer push.Close()
+		} else {
+			targetImageName = api.GetValueFor(api.TargetImageName)
+			Expect(targetImageName).NotTo(BeEmpty(), "TARGET_IMAGE_NAME environment variable must be set when MANUAL_IMAGE_SETUP is true")
+		}
 	})
 
 	Describe("Cosign initialize", func() {
@@ -107,8 +111,6 @@ var _ = Describe("Cosign test", Ordered, func() {
 			output, err := cosign.CommandOutput(testsupport.TestContext, "verify", "--certificate-identity-regexp", ".*@redhat", "--certificate-oidc-issuer-regexp", ".*keycloak.*", targetImageName)
 			Expect(err).ToNot(HaveOccurred())
 
-			logrus.Info(string(output))
-
 			startIndex := strings.Index(string(output), "[")
 			Expect(startIndex).NotTo(Equal(-1), "JSON start - '[' not found")
 
@@ -129,8 +131,6 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", logIndexStr)
 			Expect(err).ToNot(HaveOccurred())
-
-			logrus.Info(string(output))
 
 			// Look for JSON start
 			startIndex := strings.Index(string(output), "{")
@@ -197,14 +197,10 @@ var _ = Describe("Cosign test", Ordered, func() {
 		})
 
 		It("should sign and attach the predicate as an attestation to the image", func() {
-			fulcioURL := api.GetValueFor(api.FulcioURL)
-			rekorServerURL := api.GetValueFor(api.RekorURL)
-			oidcIssuerURL := api.GetValueFor(api.OidcIssuerURL)
-
 			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.GetValueFor(api.OidcIssuerURL), "jdoe", "secure", api.GetValueFor(api.OidcRealm))
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(cosign.Command(testsupport.TestContext, "attest", "-y", "--identity-token="+token, "--fulcio-url="+fulcioURL, "--rekor-url="+rekorServerURL, "--oidc-issuer="+oidcIssuerURL, "--predicate", predicatePath, "--type", "slsaprovenance", targetImageName).Run()).To(Succeed())
+			Expect(cosign.Command(testsupport.TestContext, "attest", "-y", "--identity-token="+token, "--fulcio-url="+api.GetValueFor(api.FulcioURL), "--rekor-url="+api.GetValueFor(api.RekorURL), "--oidc-issuer="+api.GetValueFor(api.OidcIssuerURL), "--predicate", predicatePath, "--type", "slsaprovenance", targetImageName).Run()).To(Succeed())
 		})
 	})
 
@@ -212,8 +208,6 @@ var _ = Describe("Cosign test", Ordered, func() {
 		It("should verify that the container image has at least one attestation and signature", func() {
 			output, err := cosign.CommandOutput(testsupport.TestContext, "tree", targetImageName)
 			Expect(err).ToNot(HaveOccurred())
-
-			logrus.Info(string(output))
 
 			// Matching (generic) hash entries
 			hashPattern := regexp.MustCompile(`└── 🍒 \w+:[0-9a-f]{64}`)
@@ -251,8 +245,6 @@ var _ = Describe("Cosign test", Ordered, func() {
 		It("should verify signature and attestation of the image", func() {
 			output, err := ec.CommandOutput(testsupport.TestContext, "validate", "image", "--image", targetImageName, "--certificate-identity-regexp", ".*@redhat", "--certificate-oidc-issuer-regexp", ".*keycloak.*", "--output", "yaml", "--show-successes")
 			Expect(err).ToNot(HaveOccurred())
-
-			logrus.Info(string(output))
 
 			successPatterns := []*regexp.Regexp{
 				regexp.MustCompile(`success: true\s+successes:`),

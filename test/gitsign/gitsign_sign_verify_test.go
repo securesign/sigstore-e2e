@@ -148,9 +148,8 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 				var output bytes.Buffer
 
 				cmd.Stdout = &output
-
 				Expect(cmd.Run()).To(Succeed())
-				logrus.Info(output.String())
+				logrus.WithField("app", "gitsign").Info(output.String())
 
 				re := regexp.MustCompile(`tlog index: (\d+)`)
 				match := re.FindStringSubmatch(output.String())
@@ -166,8 +165,6 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 
 			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", logIndex)
 			Expect(err).ToNot(HaveOccurred())
-
-			logrus.Info(string(output))
 
 			// Look for JSON start
 			startIndex := strings.Index(string(output), "{")

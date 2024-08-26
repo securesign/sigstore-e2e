@@ -27,7 +27,16 @@ func (c *cli) Command(ctx context.Context, args ...string) *exec.Cmd {
 
 func (c *cli) CommandOutput(ctx context.Context, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, c.pathToCLI, args...) // #nosec G204 - we don't expect the code to be running on PROD ENV
-	return cmd.CombinedOutput()
+	output, err := cmd.CombinedOutput()
+	entry := logrus.WithField("app", c.Name)
+	if err != nil {
+		entry.Error(string(output))
+		return nil, err
+	}
+
+	entry.Info(string(output))
+
+	return output, err
 }
 
 func (c *cli) WithSetupStrategy(strategy SetupStrategy) *cli {
