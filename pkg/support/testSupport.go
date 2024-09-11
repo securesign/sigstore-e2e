@@ -13,9 +13,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/docker/docker/api/types/registry"
+
 	"github.com/sirupsen/logrus"
 
-	"github.com/docker/docker/api/types"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
@@ -23,7 +24,7 @@ import (
 )
 
 func DockerAuth() (string, error) {
-	authConfig := types.AuthConfig{
+	authConfig := registry.AuthConfig{
 		Username:      api.GetValueFor(api.DockerRegistryUsername),
 		Password:      api.GetValueFor(api.DockerRegistryPassword),
 		ServerAddress: "redhat.registry.io",
