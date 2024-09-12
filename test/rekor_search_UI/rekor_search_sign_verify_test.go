@@ -20,6 +20,7 @@ import (
 
 var entryIndex int
 var hashWithAlg string
+var UuidStr string
 
 type G struct {
 	Got     got.G
@@ -77,7 +78,6 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 	Describe("Test email", func() {
 		It("test UI with email", func() {
 			// Properly invoke setup to get an instance of G
-			fmt.Println("came here0")
 			g := setup()
 
 			// Use the page method to navigate to the application URL
@@ -91,7 +91,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			p.MustElement("select").MustSelect("Email")
 			attrElement.MustClick()
 
-			// Fill the text field with the email "jdoe@redhat.com"
+			// Fill the text field with the email "jdoe@redhat.com alternatively we can use bob.callaway@gmail.com"
 			emailInput := p.MustElement("#rekor-search-email")
 			emailInput.MustWaitVisible().MustInput("jdoe@redhat.com") // will be replaced with the actual email used for signing
 
@@ -117,6 +117,18 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			entryIndexStr := strconv.Itoa(entryIndex)
 			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", entryIndexStr)
 			Expect(err).ToNot(HaveOccurred())
+			outputStr := string(output)
+			uuidStart := strings.Index(outputStr, "UUID: ")
+			if uuidStart == -1 {
+				fmt.Println("UUID not found")
+				return
+			}
+			UuidStr = outputStr[uuidStart+len("UUID: "):]
+			uuidEnd := strings.IndexAny(UuidStr, " \n")
+			if uuidEnd != -1 {
+				UuidStr = UuidStr[:uuidEnd]
+			}
+			fmt.Println("Extracted UUID:", UuidStr)
 			startIndex := strings.Index(string(output), "{")
 			Expect(startIndex).NotTo(Equal(-1), "JSON start - '{' not found")
 
@@ -127,6 +139,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			hashWithAlg = rekorGetOutput.RekordObj.Data.Hash.Algorithm + ":" + rekorGetOutput.RekordObj.Data.Hash.Value
+
 			g := setup() // invoke setup to get a new instance of G for this test
 			p := g.page(appURL)
 			//ensure the element is ready before interacting with it
@@ -143,7 +156,6 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			// fill the text field with the hash
 			hashInput := p.MustElement("#rekor-search-hash")
 			hashInput.MustWaitVisible().MustInput(hashWithAlg) //will be replaced with actual hash used for signing
-			fmt.Println("came here5")
 
 			// verify the input value
 			inputValue := hashInput.MustProperty("value").String()
@@ -154,7 +166,6 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 
 			//content := p.MustElement("#pf-v5-c-card")
 			//content.MustWaitVisible() //the test wont pass if we wait for the load of data (need fixing)
-			fmt.Println("Hash Done")
 		})
 	})
 
@@ -169,18 +180,17 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 
 			p.MustElement("select").MustSelect("Log Index")
 
-			//select the "hash" option from the dropdown
+			//select the "log index" option from the dropdown
 			attrElement.MustClick()
 
 			fmt.Println(entryIndexStr)
-			// fill the text field with the hash
+			// fill the text field with the log index
 			hashInput := p.MustElement(`#rekor-search-log\ index`)
-			hashInput.MustWaitVisible().MustInput(entryIndexStr) //will be replaced with actual hash used for signing
-			fmt.Println("came here5")
+			hashInput.MustWaitVisible().MustInput(entryIndexStr)
 
 			// verify the input value
 			inputValue := hashInput.MustProperty("value").String()
-			g.Got.Eq(inputValue, entryIndexStr) //here we take the hash from stack
+			g.Got.Eq(inputValue, entryIndexStr)
 
 			searchButton := p.MustElement("#search-form-button")
 			searchButton.MustClick()
@@ -188,6 +198,48 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			//content := p.MustElement("#pf-v5-c-card")
 			//content.MustWaitVisible() //the test wont pass if we wait for the load of data (need fixing)
 
+		})
+	})
+
+	Describe("Test UUID", func() {
+		It("test UI with Entry UUID", func() {
+
+			g := setup() // invoke setup to get a new instance of G for this test
+			p := g.page(appURL)
+			//ensure the element is ready before interacting with it
+			attrElement := p.MustElement("#rekor-search-attribute")
+			attrElement.MustWaitVisible().MustClick()
+
+			p.MustElement("select").MustSelect("Entry UUID")
+
+			//select the "log index" option from the dropdown
+			attrElement.MustClick()
+			// fill the text field with the log index
+			uuidInput := p.MustElement(`#rekor-search-entry\ uuid`)
+			uuidInput.MustWaitVisible().MustInput(UuidStr)
+
+			// verify the input value
+			inputValue := uuidInput.MustProperty("value").String()
+			g.Got.Eq(inputValue, UuidStr)
+			searchButton := p.MustElement("#search-form-button")
+			searchButton.MustClick()
+
+			content := p.MustElement("#pf-v5-c-card")
+			content.MustWaitVisible() //the test wont pass if we wait for the load of data (need fixing)
+
+		})
+	})
+
+	Describe("Test Commit SHA", func() {
+		It("test UI with Commit SHA using gitsign", func() {
+
+			g := setup()
+			p := g.page(appURL)
+
+			attrElement := p.MustElement("#rekor-search-attribute")
+			attrElement.MustWaitVisible().MustClick()
+
+			p.MustElement("select").MustSelect("")
 		})
 	})
 })
