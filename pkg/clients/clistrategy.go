@@ -74,7 +74,7 @@ func DownloadFromOpenshift() SetupStrategy {
 		} else {
 			fileName = filepath.Join(tmp, c.Name)
 		}
-		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711)
+		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711) //nolint:mnd
 		if err != nil {
 			return "", err
 		}
@@ -136,7 +136,7 @@ func ExtractFromContainer(image string, path string) SetupStrategy {
 			return "", err
 		}
 		fileName := tmp + string(os.PathSeparator) + cliName
-		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711)
+		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711) //nolint:mnd
 		if err != nil {
 			return "", err
 		}
