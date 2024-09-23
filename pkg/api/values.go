@@ -15,6 +15,8 @@ const (
 	CliStrategy      = "CLI_STRATEGY"
 	ManualImageSetup = "MANUAL_IMAGE_SETUP"
 	TargetImageName  = "TARGET_IMAGE_NAME"
+	CosignImage      = "COSIGN_IMAGE"
+	RegistryImage    = "REGISTRY_IMAGE"
 
 	// 'DockerRegistry*' - Login credentials for 'registry.redhat.io'.
 	DockerRegistryUsername = "REGISTRY_USERNAME"
@@ -32,6 +34,8 @@ func init() {
 	Values.SetDefault(GithubRepo, "e2e-gitsign-test")
 	Values.SetDefault(CliStrategy, "local")
 	Values.SetDefault(ManualImageSetup, "false")
+	Values.SetDefault(CosignImage, "registry.redhat.io/rhtas/cosign-rhel9:1.0.2")
+	Values.SetDefault(RegistryImage, "registry:2.8.3")
 	Values.AutomaticEnv()
 }
 

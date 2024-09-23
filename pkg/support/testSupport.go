@@ -13,9 +13,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/docker/docker/api/types/registry"
+
 	"github.com/sirupsen/logrus"
 
-	"github.com/docker/docker/api/types"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
@@ -23,7 +24,7 @@ import (
 )
 
 func DockerAuth() (string, error) {
-	authConfig := types.AuthConfig{
+	authConfig := registry.AuthConfig{
 		Username:      api.GetValueFor(api.DockerRegistryUsername),
 		Password:      api.GetValueFor(api.DockerRegistryPassword),
 		ServerAddress: "redhat.registry.io",
@@ -74,7 +75,7 @@ func DownloadAndUnzip(ctx context.Context, link string, writer io.Writer) error 
 }
 
 func Download(ctx context.Context, link string, writer io.Writer) (int64, error) {
-	client := &http.Client{Timeout: 2 * time.Minute}
+	client := &http.Client{Timeout: 2 * time.Minute} //nolint:mnd
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
 	if err != nil {
 		return 0, err
@@ -151,7 +152,7 @@ func UntarArchive(dst string, r io.Reader) error {
 		// if its a dir and it doesn't exist create it
 		case tar.TypeDir:
 			if _, err := os.Stat(target); err != nil {
-				if err := os.MkdirAll(target, 0755); err != nil {
+				if err := os.MkdirAll(target, 0755); err != nil { //nolint:mnd
 					return err
 				}
 			}
@@ -159,7 +160,7 @@ func UntarArchive(dst string, r io.Reader) error {
 		// if it's a file create it
 		case tar.TypeReg:
 			if _, err := os.Stat(filepath.Dir(target)); err != nil {
-				if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+				if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil { //nolint:mnd
 					return err
 				}
 			}
@@ -169,7 +170,7 @@ func UntarArchive(dst string, r io.Reader) error {
 			}
 
 			// copy over contents
-			if _, err := io.Copy(f, tr); err != nil {
+			if _, err := io.Copy(f, tr); err != nil { //nolint:gosec
 				return err
 			} // #nosec G110 - Don't expect decompression bomb
 

@@ -2,7 +2,6 @@ package clients
 
 import (
 	"context"
-	"fmt"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -40,7 +39,7 @@ func (c *Gitsign) GitWithGitSign(ctx context.Context, workdir string, signToken 
 		logrus.Fatal("Unsupported OS: " + runtime.GOOS)
 	}
 
-	cmd.Env = append(cmd.Env, fmt.Sprintf("SIGSTORE_ID_TOKEN=%s", signToken), "PATH="+filepath.Dir(c.pathToCLI)+pathSeparator+filepath.Dir(gitPath))
+	cmd.Env = append(cmd.Env, "SIGSTORE_ID_TOKEN="+signToken, "PATH="+filepath.Dir(c.pathToCLI)+pathSeparator+filepath.Dir(gitPath))
 	cmd.Dir = workdir
 	cmd.Stdout = logrus.NewEntry(logrus.StandardLogger()).WithField("app", "git").WriterLevel(logrus.InfoLevel)
 	cmd.Stderr = logrus.NewEntry(logrus.StandardLogger()).WithField("app", "git").WriterLevel(logrus.ErrorLevel)

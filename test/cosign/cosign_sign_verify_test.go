@@ -10,7 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
+
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
 	"github.com/securesign/sigstore-e2e/pkg/api"
@@ -73,7 +74,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			var pull io.ReadCloser
-			pull, err = dockerCli.ImagePull(testsupport.TestContext, testImage, types.ImagePullOptions{})
+			pull, err = dockerCli.ImagePull(testsupport.TestContext, testImage, image.PullOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			_, err = io.Copy(os.Stdout, pull)
 			Expect(err).ToNot(HaveOccurred())
@@ -81,7 +82,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 			Expect(dockerCli.ImageTag(testsupport.TestContext, testImage, targetImageName)).To(Succeed())
 			var push io.ReadCloser
-			push, err = dockerCli.ImagePush(testsupport.TestContext, targetImageName, types.ImagePushOptions{})
+			push, err = dockerCli.ImagePush(testsupport.TestContext, targetImageName, image.PushOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			_, err = io.Copy(os.Stdout, push)
 			Expect(err).ToNot(HaveOccurred())

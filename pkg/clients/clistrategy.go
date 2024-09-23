@@ -10,8 +10,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	imageDocker "github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -74,7 +74,7 @@ func DownloadFromOpenshift() SetupStrategy {
 		} else {
 			fileName = filepath.Join(tmp, c.Name)
 		}
-		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711)
+		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711) //nolint:mnd
 		if err != nil {
 			return "", err
 		}
@@ -106,7 +106,7 @@ func ExtractFromContainer(image string, path string) SetupStrategy {
 		if err != nil {
 			return "", err
 		}
-		pull, err := dockerCli.ImagePull(ctx, image, types.ImagePullOptions{RegistryAuth: registryAuth})
+		pull, err := dockerCli.ImagePull(ctx, image, imageDocker.PullOptions{RegistryAuth: registryAuth})
 		if err != nil {
 			return "", err
 		}
@@ -114,7 +114,7 @@ func ExtractFromContainer(image string, path string) SetupStrategy {
 		out := logrus.NewEntry(logrus.StandardLogger()).WithField("app", "docker").WriterLevel(logrus.DebugLevel)
 		_, _ = io.Copy(out, pull)
 
-		var cont container.ContainerCreateCreatedBody
+		var cont container.CreateResponse
 		if cont, err = dockerCli.ContainerCreate(ctx, &container.Config{Image: image},
 			nil,
 			nil,
@@ -136,7 +136,7 @@ func ExtractFromContainer(image string, path string) SetupStrategy {
 			return "", err
 		}
 		fileName := tmp + string(os.PathSeparator) + cliName
-		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711)
+		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711) //nolint:mnd
 		if err != nil {
 			return "", err
 		}

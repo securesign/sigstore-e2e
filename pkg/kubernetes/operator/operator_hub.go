@@ -69,7 +69,7 @@ func InstallFromOperatorHub(client kubernetes.Client, ctx context.Context, opera
 	if err != nil {
 		return err
 	}
-	return wait.PollUntilContextTimeout(ctx, 10*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, 10*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) { //nolint:mnd
 		csv, err := GetInstalledClusterServiceVersion(client, ctx, operator)
 		if err != nil {
 			if errors.IsNotFound(err) {
