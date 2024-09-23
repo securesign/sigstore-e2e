@@ -11,3 +11,6 @@ out/
 
 # MacOS
 .DS_Store
+
+bin/
+.env

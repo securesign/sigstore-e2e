@@ -1,36 +1,40 @@
-BRANCH ?= main
-REPO_URL ?= "https://github.com/securesign/sigstore-ocp.git"
-WORKDIR := $(shell mktemp -d)
-
 SHELL=/bin/bash
 
-all: get-tas install-tas install-tekton test
-gen-env: get-tas
+# options: openshift, local
+CLI_STRATEGY=local
 
-cleanup:
-	helm uninstall trusted-artifact-signer -n trusted-artifact-signer || true
-	r=$(REPO_URL); oc delete -k "$${r%.*}/keycloak/resources/base?ref=$(BRANCH)" || true
-	oc delete project fulcio-system rekor-system keycloak-system || true
+GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
+GOLANGCI_LINT_VERSION ?= v1.54.2
+golangci-lint:
+	@[ -f $(GOLANGCI_LINT) ] || { \
+	set -e ;\
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell dirname $(GOLANGCI_LINT)) $(GOLANGCI_LINT_VERSION) ;\
+	}
 
-get-tas:
-	@git clone $(REPO_URL) -b $(BRANCH) $(WORKDIR)
-	@cd $(WORKDIR)/tas-installer &&	go run main.go envgen
-	@cp $(WORKDIR)/tas-installer/tas-env-variables.sh .
+.PHONY: lint
+lint: golangci-lint ## Run golangci-lint linter & yamllint
+	$(GOLANGCI_LINT) run
 
-install-tas:
-	#TODO: involve pull secret
-	@cd $(WORKDIR) && printf "rh\njdoe@redhat.com\npassword" > vals && ./tas-easy-install.sh < vals
-	@oc wait job --for=condition=complete copy-secrets-job -n tuf-system --timeout 10m
-	@oc wait --for=condition=ready pod -A -l app.kubernetes.io/instance=trusted-artifact-signer --timeout 5m
+.PHONY: lint-fix
+lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
+	$(GOLANGCI_LINT) run --fix
 
-install-tekton:
-	oc apply -f ./scripts/tekton_subscription.yaml
-	@until [ ! -z "$$(oc get pod -l app=openshift-pipelines-operator -n openshift-operators 2>/dev/null)" ]; do \
-	sleep 10; \
-	done
-	@oc wait --for=condition=ready pod -l app=openshift-pipelines-operator -n openshift-operators --timeout 1m
+all: build env test
+
+env:
+	@./tas-env-variables.sh > .env
+
+build:
+	go build ./...
 
 test:
-	source ./tas-env-variables.sh && go test -v ./test/... --ginkgo.v
+	@echo "Running tests..."
+	@if [ -f .env ]; then \
+		echo "Loading environment variables from .env"; \
+		set -o allexport && source .env && set +o allexport; \
+	else \
+		echo ".env file not found, running tests without environment variables"; \
+	fi; \
+	go test -v ./test/...
 
-.PHONY: install-tas install_tekton test all cleanup
+.PHONY: build test all
