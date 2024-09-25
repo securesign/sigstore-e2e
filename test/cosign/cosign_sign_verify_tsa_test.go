@@ -94,10 +94,9 @@ var _ = Describe("TSA test", Ordered, func() {
 
 	Describe("download tsa chain", func() {
 		It("should download the tsa chain", func() {
-			tsaChainURL := api.GetValueFor(api.TsaURL) + "/certchain"
 			tsaChainPath = filepath.Join(tempDir, "ts_chain.pem")
 
-			resp, err := http.Get(tsaChainURL)
+			resp, err := http.Get(api.GetValueFor(api.TsaURL) + "/certchain")
 			Expect(err).ToNot(HaveOccurred())
 			defer resp.Body.Close()
 
