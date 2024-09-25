@@ -79,7 +79,7 @@ This command will replace the existing `tas-env-variables.sh` script with the on
 You can also run the tests using `go test` command or using the [ginkgo](https://onsi.github.io/ginkgo/#installing-ginkgo) client.
 If you decide to do so, you need to set [ENV variables](#environment-setup)
 ```
-source tas-env-variables.sh && go test -v ./test/... --ginkgo.v
+source tas-env-variables.sh && go test -v ./test/...
 ```
 To run tests in specific directories:
 ```

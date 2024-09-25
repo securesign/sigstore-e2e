@@ -44,6 +44,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 	)
 
 	BeforeAll(func() {
+		logrus.Infof("Starting cosign test")
 		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm)
 		if err != nil {
 			Skip("Skip this test - " + err.Error())
@@ -63,7 +64,6 @@ var _ = Describe("Cosign test", Ordered, func() {
 			}
 		})
 
-		// tempDir for publickey, signature, and predicate files
 		tempDir, err = os.MkdirTemp("", "tmp")
 		Expect(err).ToNot(HaveOccurred())
 
