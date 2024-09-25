@@ -88,14 +88,13 @@ var _ = Describe("TSA test", Ordered, func() {
 		It("should sign the container using TSA", func() {
 			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.GetValueFor(api.OidcIssuerURL), "jdoe", "secure", api.GetValueFor(api.OidcRealm))
 			Expect(err).ToNot(HaveOccurred())
-			tsaURL := "https://freetsa.org/tsr"
-			Expect(cosign.Command(testsupport.TestContext, "sign", "-y", "--timestamp-server-url", tsaURL, "--identity-token="+token, tsaTargetImageName).Run()).To(Succeed())
+			Expect(cosign.Command(testsupport.TestContext, "sign", "-y", "--timestamp-server-url", api.GetValueFor(api.TsaURL), "--identity-token="+token, tsaTargetImageName).Run()).To(Succeed())
 		})
 	})
 
 	Describe("download tsa chain", func() {
 		It("should download the tsa chain", func() {
-			tsaChainURL := "https://freetsa.org/files/cacert.pem"
+			tsaChainURL := api.GetValueFor(api.TsaURL) + "/certchain"
 			tsaChainPath = filepath.Join(tempDir, "ts_chain.pem")
 
 			resp, err := http.Get(tsaChainURL)
