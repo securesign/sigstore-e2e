@@ -36,7 +36,7 @@ var (
 	TestContext       context.Context
 	TestTimeoutMedium = 5 * time.Minute
 	// Config keys that must be defined for any test.
-	mandatoryAPIConfigKeys = []string{api.OidcIssuerURL, api.FulcioURL, api.RekorURL, api.TufURL}
+	mandatoryAPIConfigKeys = []string{api.OidcIssuerURL, api.FulcioURL, api.RekorURL, api.TufURL, api.TsaURL}
 )
 
 var installedStack []api.TestPrerequisite = make([]api.TestPrerequisite, 0)

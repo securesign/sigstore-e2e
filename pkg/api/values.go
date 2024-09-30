@@ -17,6 +17,7 @@ const (
 	TargetImageName  = "TARGET_IMAGE_NAME"
 	CosignImage      = "COSIGN_IMAGE"
 	RegistryImage    = "REGISTRY_IMAGE"
+	TsaURL           = "TSA_URL"
 
 	// 'DockerRegistry*' - Login credentials for 'registry.redhat.io'.
 	DockerRegistryUsername = "REGISTRY_USERNAME"
