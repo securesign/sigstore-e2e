@@ -103,11 +103,10 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			searchButton := p.MustElement("#search-form-button")
 			searchButton.MustClick()
 
-			// Wait for the content to be visible
-			//content := p.MustElement("#pf-v5-c-card")
-			//content.MustWaitVisible() // the test won't pass if we wait for the load of data (need fixing)
+			//content := p.MustElement(".pf-v5-c-card") //ensure that the entry is loaded and pass the test
+			//content.MustWaitVisible()
+			//cant find entry for jdoe@redhat.com or bob.callaway@gmail.com
 
-			fmt.Println("Email Done")
 		})
 	})
 
@@ -146,7 +145,6 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			attrElement := p.MustElement("#rekor-search-attribute")
 			attrElement.MustWaitVisible().MustClick()
 
-			//_ = p.MustElement("select").Select([]string{`[value="hash"]`}, false, rod.SelectorTypeCSSSector)
 			p.MustElement("select").MustSelect("Hash")
 
 			//select the "hash" option from the dropdown
@@ -164,8 +162,8 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			searchButton := p.MustElement("#search-form-button")
 			searchButton.MustClick()
 
-			//content := p.MustElement("#pf-v5-c-card")
-			//content.MustWaitVisible() //the test wont pass if we wait for the load of data (need fixing)
+			content := p.MustElement(".pf-v5-c-card") //ensure that the entry is loaded and pass the test
+			content.MustWaitVisible()
 		})
 	})
 
@@ -195,8 +193,8 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			searchButton := p.MustElement("#search-form-button")
 			searchButton.MustClick()
 
-			//content := p.MustElement("#pf-v5-c-card")
-			//content.MustWaitVisible() //the test wont pass if we wait for the load of data (need fixing)
+			content := p.MustElement(".pf-v5-c-card") //ensure that the entry is loaded and pass the test
+			content.MustWaitVisible()
 
 		})
 	})
@@ -206,6 +204,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 
 			g := setup() // invoke setup to get a new instance of G for this test
 			p := g.page(appURL)
+			defer p.Close()
 			//ensure the element is ready before interacting with it
 			attrElement := p.MustElement("#rekor-search-attribute")
 			attrElement.MustWaitVisible().MustClick()
@@ -224,22 +223,10 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			searchButton := p.MustElement("#search-form-button")
 			searchButton.MustClick()
 
-			content := p.MustElement("#pf-v5-c-card")
-			content.MustWaitVisible() //the test wont pass if we wait for the load of data (need fixing)
+			content := p.MustElement(".pf-v5-c-card") //ensure that the entry is loaded and pass the test
+			content.MustWaitVisible()
 
 		})
 	})
 
-	Describe("Test Commit SHA", func() {
-		It("test UI with Commit SHA using gitsign", func() {
-
-			g := setup()
-			p := g.page(appURL)
-
-			attrElement := p.MustElement("#rekor-search-attribute")
-			attrElement.MustWaitVisible().MustClick()
-
-			p.MustElement("select").MustSelect("")
-		})
-	})
 })
