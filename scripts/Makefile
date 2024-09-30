@@ -1,7 +1,7 @@
 SHELL=/bin/bash
 
 # options: openshift, local
-CLI_STRATEGY=local
+CLI_STRATEGY ?= local
 
 GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
 GOLANGCI_LINT_VERSION ?= v1.54.2
