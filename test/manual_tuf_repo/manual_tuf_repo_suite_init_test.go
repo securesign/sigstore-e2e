@@ -1,4 +1,4 @@
-package manual_tuf_repo
+package manualtuf
 
 import (
 	"testing"

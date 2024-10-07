@@ -1,4 +1,4 @@
-package manual_tuf_repo
+package manualtuf
 
 import (
 	"os"
@@ -252,7 +252,7 @@ func setupSecuresignDeployment(oc *clients.Oc) {
 		}
 	  }`)
 
-	var dummyPod string = "dummy"
+	var dummyPod = "dummy"
 	Expect(oc.Command(testsupport.TestContext, "run", dummyPod, "--overrides", podOverrides, "--image=registry.access.redhat.com/ubi9/httpd-24").Run()).To(Succeed())
 
 	Expect(oc.Command(testsupport.TestContext, "wait", "pod", dummyPod, "--for=condition=Ready").Run()).To(Succeed())
