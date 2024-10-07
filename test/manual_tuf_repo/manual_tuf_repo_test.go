@@ -106,7 +106,6 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 	err = os.MkdirAll(tufRepo, os.ModePerm)
 	Expect(err).ToNot(HaveOccurred())
 
-	// "tuftool root"
 	Expect(tuftool.Command(testsupport.TestContext, "root", "init", root).Run()).To(Succeed())
 	Expect(tuftool.Command(testsupport.TestContext, "root", "expire", root, rootExpiration).Run()).To(Succeed())
 
