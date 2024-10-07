@@ -1,7 +1,6 @@
 package manual_tuf_repo
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -123,7 +122,6 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 
 	Expect(tuftool.Command(testsupport.TestContext, "root", "sign", root, "-k", keyDir+"root.pem").Run()).To(Succeed())
 
-	// "tuftool create"
 	Expect(tuftool.Command(testsupport.TestContext, "create",
 		"--root", root,
 		"--key", keyDir+"root.pem",
@@ -139,7 +137,6 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 		"--timestamp-version", "1",
 		"--outdir", tufRepo).Run()).To(Succeed())
 
-	// "tuftool rhtas"
 	Expect(tuftool.Command(testsupport.TestContext, "rhtas",
 		"--root", root,
 		"--key", keyDir+"root.pem",
@@ -261,13 +258,10 @@ func setupSecuresignDeployment(oc *clients.Oc) {
 
 	Expect(oc.Command(testsupport.TestContext, "wait", "pod", dummyPod, "--for=condition=Ready").Run()).To(Succeed())
 
-	// time.Sleep(20 * time.Second) //TODO: Replace with proper wait
-
 	Expect(oc.Command(testsupport.TestContext, "rsync", "--no-perms", tufRepo+"/", dummyPod+":/var/www/html").Run()).To(Succeed())
 
 	Expect(oc.Command(testsupport.TestContext, "delete", "pod", "dummy").Run()).To(Succeed())
 
-	// Create the secrets for TUF signing
 	Expect(oc.Command(testsupport.TestContext, "create", "secret", "generic", "ctfe-secret",
 		"--from-file=private=targets/ctfe_private_key.pem",
 		"--from-file=password=targets/ctfe-password.pem",
@@ -301,7 +295,7 @@ var _ = AfterSuite(func() {
 	Expect(os.RemoveAll(workdir)).To(Succeed())
 })
 
-func GetMandatoryAPIConfigValues(maxAttempts int) error {
+func GetMandatoryAPIConfigValues(maxAttempts int) {
 	interval := 20 * time.Second
 	attempt := 1
 
@@ -346,18 +340,19 @@ func GetMandatoryAPIConfigValues(maxAttempts int) error {
 
 		if len(missingVars) == 0 {
 			logrus.Info("All mandatory API config values are set")
-			return nil
+			return
 		}
 
 		logrus.Warnf("Missing variables: %v. Retrying in %v seconds", missingVars, interval.Seconds())
 
 		if attempt == maxAttempts && len(missingVars) > 0 {
-			logrus.Errorf("mandatory API config values not set within %v seconds", maxAttempts*int(interval.Seconds()))
+			Expect(missingVars).To(BeEmpty())
 			break
 		}
 
 		time.Sleep(interval)
 		attempt++
 	}
-	return fmt.Errorf("mandatory API config values not set within %v seconds", maxAttempts*int(interval.Seconds()))
+	logrus.Errorf("mandatory API config values not set within %v seconds", maxAttempts*int(interval.Seconds()))
+
 }
