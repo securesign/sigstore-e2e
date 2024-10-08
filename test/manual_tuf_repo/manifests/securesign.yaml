@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/part-of: trusted-artifact-signer
   annotations:
     rhtas.redhat.com/metrics: 'true'
-  namespace: trusted-artifact-signer
+  namespace: NEW_TEST_NAMESPACE
 spec:
   ctlog:
     monitoring:

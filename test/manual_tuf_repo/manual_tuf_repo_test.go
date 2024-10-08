@@ -23,6 +23,7 @@ var keyDir string
 var tufRepo string
 var rootDir string
 
+const newTestNamespace string = "tuf-repo-test"
 const ctlogPubkeyPath string = "targets/ctfe.pub"
 const fulcioCertPath string = "targets/fulcio_v1.crt.pem"
 const rekorPubkeyPath string = "targets/rekor.pub"
@@ -210,15 +211,22 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 }
 
 func setupSecuresignDeployment(oc *clients.Oc) {
-
-	if oc.Command(testsupport.TestContext, "get", "namespace", "trusted-artifact-signer").Run() == nil {
-		Expect(oc.Command(testsupport.TestContext, "delete", "namespace", "trusted-artifact-signer").Run()).To(Succeed())
+	if oc.Command(testsupport.TestContext, "get", "namespace", newTestNamespace).Run() == nil {
+		Expect(oc.Command(testsupport.TestContext, "delete", "namespace", newTestNamespace).Run()).To(Succeed())
 	} else {
-		logrus.Info("Namespace trusted-artifact-signer does not exist, skipping deletion.")
+		logrus.Infof("Namespace %s does not exist, skipping deletion.", newTestNamespace)
 	}
-	Expect(oc.Command(testsupport.TestContext, "new-project", "trusted-artifact-signer").Run()).To(Succeed())
+	Expect(oc.Command(testsupport.TestContext, "new-project", newTestNamespace).Run()).To(Succeed())
 
-	Expect(oc.Command(testsupport.TestContext, "create", "-f", pvcPath).Run()).To(Succeed())
+	yamlData, err := os.ReadFile(pvcPath)
+	Expect(err).ToNot(HaveOccurred())
+
+	pvcContent := string(yamlData)
+	pvcContent = strings.ReplaceAll(pvcContent, "NEW_TEST_NAMESPACE", newTestNamespace)
+
+	pvcTempPath := filepath.Join(workdir, "pvc.yaml")
+	Expect(os.WriteFile(pvcTempPath, []byte(pvcContent), 0600)).To(Succeed())
+	Expect(oc.Command(testsupport.TestContext, "create", "-f", pvcTempPath).Run()).To(Succeed())
 
 	podOverrides := (`{
 		"apiVersion": "v1",
@@ -252,7 +260,7 @@ func setupSecuresignDeployment(oc *clients.Oc) {
 		}
 	  }`)
 
-	var dummyPod = "dummy"
+	const dummyPod = "dummy"
 	Expect(oc.Command(testsupport.TestContext, "run", dummyPod, "--overrides", podOverrides, "--image=registry.access.redhat.com/ubi9/httpd-24").Run()).To(Succeed())
 
 	Expect(oc.Command(testsupport.TestContext, "wait", "pod", dummyPod, "--for=condition=Ready").Run()).To(Succeed())
@@ -279,11 +287,12 @@ func setupSecuresignDeployment(oc *clients.Oc) {
 		"--from-file=leafPrivateKeyPassword=targets/tsa-leaf-password",
 		"--from-file=leafPrivateKey=targets/tsa_leaf_private_key.pem").Run()).To(Succeed())
 
-	yamlData, err := os.ReadFile(securesignPath)
+	yamlData, err = os.ReadFile(securesignPath)
 	Expect(err).ToNot(HaveOccurred())
 
 	securesignContent := string(yamlData)
 	securesignContent = strings.ReplaceAll(securesignContent, "OIDC_ISSUER_URL", api.GetValueFor(api.OidcIssuerURL))
+	securesignContent = strings.ReplaceAll(securesignContent, "NEW_TEST_NAMESPACE", newTestNamespace)
 
 	securesignTempPath := filepath.Join(workdir, "securesign.yaml")
 	Expect(os.WriteFile(securesignTempPath, []byte(securesignContent), 0600)).To(Succeed())

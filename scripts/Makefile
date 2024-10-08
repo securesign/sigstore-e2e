@@ -22,7 +22,6 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 all: build env test
 
 env:
-	@oc project trusted-artifact-signer
 	@./tas-env-variables.sh > .env
 
 build:

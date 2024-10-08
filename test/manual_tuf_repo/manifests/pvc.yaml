@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: tuf
-  namespace: trusted-artifact-signer
+  namespace: NEW_TEST_NAMESPACE
 spec:
   accessModes:
     - ReadWriteOnce
