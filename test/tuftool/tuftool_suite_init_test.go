@@ -1,4 +1,4 @@
-package manualtuf
+package tuftool
 
 import (
 	"testing"
