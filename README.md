@@ -29,7 +29,7 @@ This test suite aims to cover Trusted Artifact Signer deployment with end-to-end
 ```
 export CLI_STRATEGY=openshift
 ```
-This configures the test suite to download `cosign`, `gitsign`, `rekor-cli`, and `ec` binaries from the cluster's console. If not set, the suite will use local binaries by default.
+This configures the test suite to download `cosign`, `gitsign`, `rekor-cli`, `ec`, `tuftool` binaries from the cluster's console. If not set, the suite will use local binaries by default.
 
 - Optional: To use a manual image setup, set the `MANUAL_IMAGE_SETUP` environment variable to `true` and specify the `TARGET_IMAGE_NAME`.
 ```
@@ -49,13 +49,6 @@ Options:
 
 1. Follow instructions at https://github.com/securesign/sigstore-ocp/tree/main
 2. Install from OperatorHub
-3. Use provided Makefile: `make install-tas`
-
-#### OpenShift Pipelines
-Options:
-
-1. Install from OperatorHub
-2. Use provided Makefile: `make install-tekton`
 
 ## Running Tests
 ### Full Setup and Test Execution
@@ -63,33 +56,20 @@ Options:
 make all
 ```
 
-### Run Tests on Prepared Cluster
+### Load Environment Variables and Run Tests
 ```
-make test
+make env test
 ```
-This command will source `tas-env-variables.sh` and run the test suite
-
-### Update Environment Variables and Run Tests
-```
-make get-env test
-```
-This command will replace the existing `tas-env-variables.sh` script with the one from https://github.com/securesign/sigstore-ocp/blob/main/tas-env-variables.sh. If you use this command, the file with environment variables needs to be generated whenever the component paths change.
 
 ### Manual Test Execution with Ginkgo
 You can also run the tests using `go test` command or using the [ginkgo](https://onsi.github.io/ginkgo/#installing-ginkgo) client.
 If you decide to do so, you need to set [ENV variables](#environment-setup)
 ```
-source tas-env-variables.sh && go test -v ./test/...
+source tas-env-variables.sh && go test -v ./test/... --ginkgo.v
 ```
 To run tests in specific directories:
 ```
 ginkgo -v test/cosign test/gitsign
-```
-
-### Cleanup
-To clean up the cluster after testing:
-```
-make cleanup
 ```
 
 ## Notes

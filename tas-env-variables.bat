@@ -6,12 +6,15 @@ for /f "tokens=*" %%i in ('oc get route keycloak -n keycloak-system --template^=
 set OIDC_ISSUER_URL=https://%OIDC_ROUTE%/auth/realms/trusted-artifact-signer
 for /f "tokens=*" %%i in ('oc get fulcio -o jsonpath^="{.items[0].status.url}" -n trusted-artifact-signer') do set COSIGN_FULCIO_URL=%%i
 for /f "tokens=*" %%i in ('oc get rekor -o jsonpath^="{.items[0].status.url}" -n trusted-artifact-signer') do set COSIGN_REKOR_URL=%%i
+for /f "tokens=*" %%i in ('oc get timestampauthorities -o jsonpath^="{.items[0].status.url}" -n trusted-artifact-signer') do set TSA=%%i
+set TSA_URL=%TSA%/api/v1/timestamp
 
 REM Print the URLs
 echo TUF_URL: %TUF_URL%
 echo OIDC_ISSUER_URL: %OIDC_ISSUER_URL%
 echo COSIGN_FULCIO_URL: %COSIGN_FULCIO_URL%
 echo COSIGN_REKOR_URL: %COSIGN_REKOR_URL%
+echo TSA_URL: %TSA_URL%
 
 REM Export the environment variables for the current session
 set COSIGN_MIRROR=%TUF_URL%
@@ -25,6 +28,7 @@ set SIGSTORE_OIDC_ISSUER=%OIDC_ISSUER_URL%
 set SIGSTORE_REKOR_URL=%COSIGN_REKOR_URL%
 set REKOR_REKOR_SERVER=%COSIGN_REKOR_URL%
 set SIGSTORE_OIDC_CLIENT_ID=trusted-artifact-signer
+set TSA_URL=%TSA_URL%
 
 REM Print the environment variables to verify they are set
 echo TUF_URL: %TUF_URL%
@@ -42,3 +46,4 @@ echo SIGSTORE_OIDC_ISSUER: %SIGSTORE_OIDC_ISSUER%
 echo SIGSTORE_REKOR_URL: %SIGSTORE_REKOR_URL%
 echo REKOR_REKOR_SERVER: %REKOR_REKOR_SERVER%
 echo SIGSTORE_OIDC_CLIENT_ID: %SIGSTORE_OIDC_CLIENT_ID%
+echo TSA_URL: %TSA_URL%
