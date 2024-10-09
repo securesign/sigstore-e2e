@@ -232,7 +232,7 @@ func verifyWorkdirStructure(rootPath string) {
 
 		if info.IsDir() {
 			_, exists := expectedDirs[relPath]
-			Expect(exists).To(BeTrue(), fmt.Sprintf("unexpected directory: %s", relPath))
+			Expect(exists).To(BeTrue(), "unexpected directory: "+relPath)
 			delete(expectedDirs, relPath)
 		} else {
 			if strings.HasPrefix(relPath, "tuf-repo/targets/") {
@@ -243,10 +243,10 @@ func verifyWorkdirStructure(rootPath string) {
 						break
 					}
 				}
-				Expect(validSuffix).To(BeTrue(), fmt.Sprintf("unexpected file in targets: %s", relPath))
+				Expect(validSuffix).To(BeTrue(), "unexpected file in targets: "+relPath)
 			} else {
 				_, exists := expectedFiles[relPath]
-				Expect(exists).To(BeTrue(), fmt.Sprintf("unexpected file: %s", relPath))
+				Expect(exists).To(BeTrue(), "unexpected file: "+relPath)
 				delete(expectedFiles, relPath)
 			}
 		}
