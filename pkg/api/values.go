@@ -13,6 +13,7 @@ const (
 	GithubOwner      = "TEST_GITHUB_OWNER"
 	GithubRepo       = "TEST_GITHUB_REPO"
 	CliStrategy      = "CLI_STRATEGY"
+	CLIServerURL     = "CLI_SERVER_URL"
 	ManualImageSetup = "MANUAL_IMAGE_SETUP"
 	TargetImageName  = "TARGET_IMAGE_NAME"
 	CosignImage      = "COSIGN_IMAGE"

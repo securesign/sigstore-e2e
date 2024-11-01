@@ -14,17 +14,7 @@ import (
 	"time"
 
 	"github.com/securesign/sigstore-e2e/pkg/api"
-	"github.com/securesign/sigstore-e2e/pkg/kubernetes"
-
-	configv1 "github.com/openshift/api/config/v1"
-	consoleCli "github.com/openshift/api/console/v1"
-	projectv1 "github.com/openshift/api/project/v1"
-	routev1 "github.com/openshift/api/route/v1"
-	olmV1 "github.com/operator-framework/api/pkg/operators/v1"
-	olmV1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/sirupsen/logrus"
-	v1beta12 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
-	tektonTriggers "github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1"
 )
 
 const (
@@ -43,22 +33,6 @@ var installedStack []api.TestPrerequisite = make([]api.TestPrerequisite, 0)
 
 func init() {
 	TestContext = context.TODO()
-
-	var err error
-
-	// Initialization of kubernetes client
-	if kubernetes.K8sClient, err = kubernetes.NewClient(); err != nil {
-		panic(err)
-	}
-
-	_ = olmV1alpha1.AddToScheme(kubernetes.K8sClient.GetScheme())
-	_ = olmV1.AddToScheme(kubernetes.K8sClient.GetScheme())
-	_ = projectv1.AddToScheme(kubernetes.K8sClient.GetScheme())
-	_ = routev1.AddToScheme(kubernetes.K8sClient.GetScheme())
-	_ = tektonTriggers.AddToScheme(kubernetes.K8sClient.GetScheme())
-	_ = configv1.AddToScheme(kubernetes.K8sClient.GetScheme())
-	_ = v1beta12.AddToScheme(kubernetes.K8sClient.GetScheme())
-	_ = consoleCli.AddToScheme(kubernetes.K8sClient.GetScheme())
 
 	logrus.SetFormatter(&logrus.TextFormatter{
 		SortingFunc: func(s []string) {

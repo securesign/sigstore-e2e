@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -28,6 +29,12 @@ func PreferredSetupStrategy() SetupStrategy {
 	switch api.GetValueFor(api.CliStrategy) {
 	case "openshift":
 		preferredStrategy = DownloadFromOpenshift()
+	case "cli_server":
+		server := api.GetValueFor(api.CLIServerURL)
+		if server == "" {
+			panic("CLI server URL not specified")
+		}
+		preferredStrategy = DownloadFromCLIServer(server)
 	case "local":
 		preferredStrategy = LocalBinary()
 	default:
@@ -61,30 +68,7 @@ func DownloadFromOpenshift() SetupStrategy {
 			return "", err
 		}
 
-		tmp, err := os.MkdirTemp("", c.Name)
-		if err != nil {
-			return "", err
-		}
-
-		logrus.Info("Downloading ", c.Name, " from ", link)
-
-		var fileName string
-		if runtime.GOOS == "windows" {
-			fileName = filepath.Join(tmp, c.Name+".exe")
-		} else {
-			fileName = filepath.Join(tmp, c.Name)
-		}
-		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711) //nolint:mnd
-		if err != nil {
-			return "", err
-		}
-		defer file.Close()
-
-		if err = support.DownloadAndUnzip(ctx, link, file); err != nil {
-			return "", err
-		}
-
-		return file.Name(), err
+		return downloadFromLink(ctx, c, link)
 	}
 }
 
@@ -158,4 +142,39 @@ func ExtractFromContainer(image string, path string) SetupStrategy {
 		}
 		return file.Name(), err
 	}
+}
+
+func DownloadFromCLIServer(serverURL string) SetupStrategy {
+	return func(ctx context.Context, c *cli) (string, error) {
+		logrus.Info("Getting binary '", c.Name, "' from CLI server", "Server URL", serverURL)
+		link := fmt.Sprintf("https://%s/clients/%s/%s-%s.gz", serverURL, runtime.GOOS, c.Name, runtime.GOARCH)
+		return downloadFromLink(ctx, c, link)
+	}
+}
+
+func downloadFromLink(ctx context.Context, c *cli, link string) (string, error) {
+	tmp, err := os.MkdirTemp("", c.Name)
+	if err != nil {
+		return "", err
+	}
+
+	logrus.Info("Downloading ", c.Name, " from ", link)
+
+	var fileName string
+	if runtime.GOOS == "windows" {
+		fileName = filepath.Join(tmp, c.Name+".exe")
+	} else {
+		fileName = filepath.Join(tmp, c.Name)
+	}
+	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0711) //nolint:mnd
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	if err = support.DownloadAndUnzip(ctx, link, file); err != nil {
+		return "", err
+	}
+
+	return file.Name(), err
 }
