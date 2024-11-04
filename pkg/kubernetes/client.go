@@ -3,7 +3,9 @@ package kubernetes
 import (
 	"context"
 	"os"
+	"sync"
 
+	consoleCli "github.com/openshift/api/console/v1"
 	projectv1 "github.com/openshift/api/project/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,7 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
-var K8sClient Client
+var k8sClient Client
+var once sync.Once
 
 // Client is an abstraction for a k8s client.
 type Client interface {
@@ -47,8 +50,20 @@ func (c *defaultClient) GetConfig() *rest.Config {
 	return c.config
 }
 
+func GetClient() Client {
+	once.Do(func() {
+		var err error
+		if k8sClient, err = newClient(); err != nil {
+			panic(err)
+		}
+		_ = projectv1.AddToScheme(k8sClient.GetScheme())
+		_ = consoleCli.AddToScheme(k8sClient.GetScheme())
+	})
+	return k8sClient
+}
+
 // NewClient creates a new k8s client that can be used from outside or in the cluster.
-func NewClient() (Client, error) {
+func newClient() (Client, error) {
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {

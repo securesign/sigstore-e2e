@@ -14,7 +14,7 @@ func ConsoleCLIDownload(ctx context.Context, cli string, os string, arch string)
 	ok := controller.ObjectKey{
 		Name: cli,
 	}
-	err := K8sClient.Get(ctx, ok, cld)
+	err := GetClient().Get(ctx, ok, cld)
 	if err != nil {
 		return "", err
 	}
