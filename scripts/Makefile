@@ -35,14 +35,11 @@ test:
 	else \
 		echo ".env file not found, running tests without environment variables"; \
 	fi; \
-	go test -v ./test/cosign ./test/gitsign ./test/rekorcli --ginkgo.v
+	go test -v ./test/... --ginkgo.v
 
 tuf-repo:
 	@echo "Running manual TUF repository test..."
-	@export SIGSTORE_OIDC_ISSUER=$(shell echo "https://$$(oc get route keycloak -n keycloak-system | tail -n 1 | awk '{print $$2}')/auth/realms/trusted-artifact-signer"); \
-	go test -v ./test/manual_tuf_repo --ginkgo.v
-
-test-tuf-repo: tuf-repo env test
+	go test -v ./test/tuftool --ginkgo.v
 
 .PHONY: build test test-tuf-repo all 
  
