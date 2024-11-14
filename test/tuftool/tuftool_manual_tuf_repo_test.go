@@ -26,10 +26,8 @@ const fulcioCertPath string = "targets/fulcio_v1.crt.pem"
 const rekorPubkeyPath string = "targets/rekor.pub"
 const tsaCertPath string = "targets/tsa.certchain.pem"
 
-const rootExpiration string = "in 52 weeks"
-const snapshotExpiration string = "in 52 weeks"
-const targetsExpiration string = "in 52 weeks"
-const timestampExpiration string = "in 10 days"
+const expirationWeeks52 string = "in 52 weeks"
+const expirationDays10 string = "in 10 days"
 
 var _ = Describe("TUF manual repo test", Ordered, func() {
 
@@ -53,20 +51,16 @@ var _ = Describe("TUF manual repo test", Ordered, func() {
 		workdir, err = os.MkdirTemp("", "trustroot_example")
 		Expect(err).ToNot(HaveOccurred())
 
+		logrus.Infof("Created temporary directory: %s", workdir)
 	})
 
-	Describe("Setup TUF repository via tuftool", func() {
-		It("should setup maunal TUF repo", func() {
-			setupManualTufRepo(tuftool)
-		})
+	It("should setup repository via tuftool", func() {
+		setupManualTufRepo(tuftool)
 	})
 
-	Describe("Verify workdir structure", func() {
-		It("should verify workdir structure", func() {
-			verifyWorkdirStructure(workdir)
-		})
+	It("should verify workdir structure", func() {
+		verifyWorkdirStructure(workdir)
 	})
-
 })
 
 func setupManualTufRepo(tuftool *clients.Tuftool) {
@@ -87,7 +81,7 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 	Expect(err).ToNot(HaveOccurred())
 
 	Expect(tuftool.Command(testsupport.TestContext, "root", "init", root).Run()).To(Succeed())
-	Expect(tuftool.Command(testsupport.TestContext, "root", "expire", root, rootExpiration).Run()).To(Succeed())
+	Expect(tuftool.Command(testsupport.TestContext, "root", "expire", root, expirationWeeks52).Run()).To(Succeed())
 
 	Expect(tuftool.Command(testsupport.TestContext, "root", "set-threshold", root, "root", "1").Run()).To(Succeed())
 	Expect(tuftool.Command(testsupport.TestContext, "root", "set-threshold", root, "snapshot", "1").Run()).To(Succeed())
@@ -108,11 +102,11 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 		"--key", keyDir+"/targets.pem",
 		"--key", keyDir+"/timestamp.pem",
 		"--add-targets", input,
-		"--targets-expires", targetsExpiration,
+		"--targets-expires", expirationWeeks52,
 		"--targets-version", "1",
-		"--snapshot-expires", snapshotExpiration,
+		"--snapshot-expires", expirationWeeks52,
 		"--snapshot-version", "1",
-		"--timestamp-expires", timestampExpiration,
+		"--timestamp-expires", expirationDays10,
 		"--timestamp-version", "1",
 		"--outdir", tufRepo).Run()).To(Succeed())
 
@@ -124,11 +118,11 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 		"--key", keyDir+"/timestamp.pem",
 		"--set-ctlog-target", ctlogPubkeyPath,
 		"--ctlog-uri", "https://ctlog.rhtas",
-		"--targets-expires", targetsExpiration,
+		"--targets-expires", expirationWeeks52,
 		"--targets-version", "1",
-		"--snapshot-expires", snapshotExpiration,
+		"--snapshot-expires", expirationWeeks52,
 		"--snapshot-version", "1",
-		"--timestamp-expires", timestampExpiration,
+		"--timestamp-expires", expirationDays10,
 		"--timestamp-version", "1",
 		"--force-version",
 		"--outdir", tufRepo,
@@ -142,11 +136,11 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 		"--key", keyDir+"/timestamp.pem",
 		"--set-fulcio-target", fulcioCertPath,
 		"--fulcio-uri", "https://fulcio.rhtas",
-		"--targets-expires", targetsExpiration,
+		"--targets-expires", expirationWeeks52,
 		"--targets-version", "1",
-		"--snapshot-expires", snapshotExpiration,
+		"--snapshot-expires", expirationWeeks52,
 		"--snapshot-version", "1",
-		"--timestamp-expires", timestampExpiration,
+		"--timestamp-expires", expirationDays10,
 		"--timestamp-version", "1",
 		"--force-version",
 		"--outdir", tufRepo,
@@ -160,11 +154,11 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 		"--key", keyDir+"/timestamp.pem",
 		"--set-rekor-target", rekorPubkeyPath,
 		"--rekor-uri", "https://rekor.rhtas",
-		"--targets-expires", targetsExpiration,
+		"--targets-expires", expirationWeeks52,
 		"--targets-version", "1",
-		"--snapshot-expires", snapshotExpiration,
+		"--snapshot-expires", expirationWeeks52,
 		"--snapshot-version", "1",
-		"--timestamp-expires", timestampExpiration,
+		"--timestamp-expires", expirationDays10,
 		"--timestamp-version", "1",
 		"--force-version",
 		"--outdir", tufRepo,
@@ -178,11 +172,11 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 		"--key", keyDir+"/timestamp.pem",
 		"--set-tsa-target", tsaCertPath,
 		"--tsa-uri", "https://tsa.rhtas",
-		"--targets-expires", targetsExpiration,
+		"--targets-expires", expirationWeeks52,
 		"--targets-version", "1",
-		"--snapshot-expires", snapshotExpiration,
+		"--snapshot-expires", expirationWeeks52,
 		"--snapshot-version", "1",
-		"--timestamp-expires", timestampExpiration,
+		"--timestamp-expires", expirationDays10,
 		"--timestamp-version", "1",
 		"--force-version",
 		"--outdir", tufRepo,
@@ -232,7 +226,7 @@ func verifyWorkdirStructure(rootPath string) {
 
 		if info.IsDir() {
 			_, exists := expectedDirs[relPath]
-			Expect(exists).To(BeTrue(), "unexpected directory: "+relPath)
+			Expect(exists).To(BeTrue(), "unexpected directory: "+filepath.Join(rootPath, relPath))
 			delete(expectedDirs, relPath)
 		} else {
 			if strings.HasPrefix(relPath, "tuf-repo/targets/") {
@@ -243,10 +237,10 @@ func verifyWorkdirStructure(rootPath string) {
 						break
 					}
 				}
-				Expect(validSuffix).To(BeTrue(), "unexpected file in targets: "+relPath)
+				Expect(validSuffix).To(BeTrue(), "unexpected file in targets: "+filepath.Join(rootPath, relPath))
 			} else {
 				_, exists := expectedFiles[relPath]
-				Expect(exists).To(BeTrue(), "unexpected file: "+relPath)
+				Expect(exists).To(BeTrue(), "unexpected file: "+filepath.Join(rootPath, relPath))
 				delete(expectedFiles, relPath)
 			}
 		}
@@ -256,9 +250,21 @@ func verifyWorkdirStructure(rootPath string) {
 
 	Expect(err).ToNot(HaveOccurred())
 
-	Expect(expectedDirs).To(BeEmpty(), fmt.Sprintf("missing directories: %v", expectedDirs))
+	if len(expectedDirs) > 0 {
+		missingDirs := []string{}
+		for dir := range expectedDirs {
+			missingDirs = append(missingDirs, filepath.Join(workdir, dir)) // Add full path
+		}
+		Expect(missingDirs).To(BeEmpty(), fmt.Sprintf("missing directories: %v", missingDirs))
+	}
 
-	Expect(expectedFiles).To(BeEmpty(), fmt.Sprintf("missing files: %v", expectedFiles))
+	if len(expectedFiles) > 0 {
+		missingFiles := []string{}
+		for file := range expectedFiles {
+			missingFiles = append(missingFiles, filepath.Join(workdir, file)) // Add full path
+		}
+		Expect(missingFiles).To(BeEmpty(), fmt.Sprintf("missing files: %v", missingFiles))
+	}
 }
 
 var _ = AfterSuite(func() {
