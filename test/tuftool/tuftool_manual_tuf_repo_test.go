@@ -213,6 +213,11 @@ func verifyWorkdirStructure(rootPath string) {
 		".rekor.pub",
 	}
 
+	foundSuffixesCount := make(map[string]int)
+	for _, suffix := range targetSuffixes {
+		foundSuffixesCount[suffix] = 0 // Initialize count for each suffix
+	}
+
 	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
 		Expect(err).ToNot(HaveOccurred())
 
@@ -233,6 +238,7 @@ func verifyWorkdirStructure(rootPath string) {
 				validSuffix := false
 				for _, suffix := range targetSuffixes {
 					if strings.HasSuffix(relPath, suffix) {
+						foundSuffixesCount[suffix]++
 						validSuffix = true
 						break
 					}
@@ -253,7 +259,7 @@ func verifyWorkdirStructure(rootPath string) {
 	if len(expectedDirs) > 0 {
 		missingDirs := []string{}
 		for dir := range expectedDirs {
-			missingDirs = append(missingDirs, filepath.Join(workdir, dir)) // Add full path
+			missingDirs = append(missingDirs, filepath.Join(workdir, dir))
 		}
 		Expect(missingDirs).To(BeEmpty(), fmt.Sprintf("missing directories: %v", missingDirs))
 	}
@@ -261,9 +267,19 @@ func verifyWorkdirStructure(rootPath string) {
 	if len(expectedFiles) > 0 {
 		missingFiles := []string{}
 		for file := range expectedFiles {
-			missingFiles = append(missingFiles, filepath.Join(workdir, file)) // Add full path
+			missingFiles = append(missingFiles, filepath.Join(workdir, file))
 		}
 		Expect(missingFiles).To(BeEmpty(), fmt.Sprintf("missing files: %v", missingFiles))
+	}
+
+	for suffix, count := range foundSuffixesCount {
+		if suffix == ".trusted_root.json" {
+			// Allow multiple .trusted_root.json files
+			Expect(count).To(BeNumerically(">=", 1), fmt.Sprintf("Expected at least one .trusted_root.json file, found %d", count))
+		} else {
+			// Ensure only one file for other suffixes
+			Expect(count).To(Equal(1), fmt.Sprintf("Expected exactly one file with suffix %s, found %d", suffix, count))
+		}
 	}
 }
 
