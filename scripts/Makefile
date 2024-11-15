@@ -35,6 +35,11 @@ test:
 	else \
 		echo ".env file not found, running tests without environment variables"; \
 	fi; \
-	go test -v ./test/...
+	go test -v ./test/... --ginkgo.v
 
-.PHONY: build test all
+tuf-repo:
+	@echo "Running manual TUF repository test..."
+	go test -v ./test/tuftool --ginkgo.v
+
+.PHONY: build test test-tuf-repo all 
+ 
