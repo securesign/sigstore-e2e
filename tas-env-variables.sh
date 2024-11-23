@@ -16,6 +16,8 @@ export SIGSTORE_REKOR_URL=$COSIGN_REKOR_URL
 export REKOR_REKOR_SERVER=$COSIGN_REKOR_URL
 export SIGSTORE_OIDC_CLIENT_ID=trusted-artifact-signer
 export TSA_URL=$(oc get timestampauthorities -o jsonpath='{.items[0].status.url}')/api/v1/timestamp
+export REKOR_UI_URL=$(oc get rekor -o jsonpath='{.items[0].status.rekorSearchUIUrl}' -n trusted-artifact-signer)
+export SIGSTORE_REKOR_UI_URL=$REKOR_UI_URL
 
 # Print the environment variables to verify they are set
 echo "TUF_URL=$TUF_URL"
@@ -34,4 +36,6 @@ echo "SIGSTORE_REKOR_URL=$SIGSTORE_REKOR_URL"
 echo "REKOR_REKOR_SERVER=$REKOR_REKOR_SERVER"
 echo "SIGSTORE_OIDC_CLIENT_ID=$SIGSTORE_OIDC_CLIENT_ID"
 echo "TSA_URL=$TSA_URL"
+echo "SIGSTORE_REKOR_UI_URL=$SIGSTORE_REKOR_UI_URL"
+echo "REKOR_UI_URL=$REKOR_UI_URL"
 
