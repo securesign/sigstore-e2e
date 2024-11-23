@@ -1,4 +1,4 @@
-package rekor_search_UI
+package rekorSearchUI
 
 import (
 	"encoding/json"
@@ -67,7 +67,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 	appURL := api.GetValueFor(api.RekorUIURL)
 
 	setup := func() G {
-		launch := launcher.New().Headless(true) //if you want to see process of testing realtime, just rewrite true to false
+		launch := launcher.New().Headless(false) // if you want to see process of testing realtime, just rewrite true to false
 		url := launch.MustLaunch()
 		browser := rod.New().ControlURL(url).MustConnect()
 
@@ -202,7 +202,8 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 		Expect(startIndex).NotTo(Equal(-1), "JSON start - '{' not found")
 
 		var rekorGetOutput testsupport.RekorCLIGetOutput
-		err = json.Unmarshal([]byte(fullOutput[startIndex:]), &rekorGetOutput)
+		err = json.Unmarshal(fullOutput[startIndex:], &rekorGetOutput)
+
 		Expect(err).ToNot(HaveOccurred())
 		// algorithm with hash
 		testData.Hash = rekorGetOutput.RekordObj.Data.Hash.Algorithm + ":" + rekorGetOutput.RekordObj.Data.Hash.Value
@@ -212,9 +213,9 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 	Describe("Test email search", func() {
 		It("should search by email in Rekor UI", func() {
 			g := setup()
-			defer g.Browser.Close()
-
 			p := g.page(appURL)
+			defer p.Close()
+			defer g.Browser.Close()
 
 			attrElement := p.MustElement("#rekor-search-attribute")
 			attrElement.MustWaitVisible().MustClick()
@@ -248,6 +249,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			browser = g.Browser
 			p := g.page(appURL)
 			page = p
+			defer p.Close()
 
 			attrElement := p.MustElement("#rekor-search-attribute")
 			attrElement.MustWaitVisible().MustClick()
@@ -283,6 +285,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			browser = g.Browser
 			p := g.page(appURL)
 			page = p
+			defer p.Close()
 
 			attrElement := p.MustElement("#rekor-search-attribute")
 			attrElement.MustWaitVisible().MustClick()
@@ -314,6 +317,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			browser = g.Browser
 			p := g.page(appURL)
 			page = p
+			defer p.Close()
 
 			attrElement := p.MustElement("#rekor-search-attribute")
 			attrElement.MustWaitVisible().MustClick()
@@ -378,5 +382,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			_ = browser.Close() // close the browser
 			browser = nil
 		}
+
 	})
+
 })

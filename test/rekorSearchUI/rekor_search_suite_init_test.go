@@ -1,4 +1,4 @@
-package rekor_search_UI
+package rekorSearchUI
 
 import (
 	"testing"
