@@ -67,7 +67,8 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 	appURL := api.GetValueFor(api.RekorUIURL)
 
 	setup := func() G {
-		launch := launcher.New().Headless(false) // if you want to see process of testing realtime, just rewrite true to false
+		headless := api.GetValueFor(api.HeadlessUI) == "true"
+		launch := launcher.New().Headless(headless)
 		url := launch.MustLaunch()
 		browser := rod.New().ControlURL(url).MustConnect()
 
@@ -83,6 +84,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 
 	BeforeAll(func() {
 		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm)
+		err = testsupport.CheckMandatoryAPIConfigValues(api.RekorUIURL)
 		if err != nil {
 			Skip("Skip this test - " + err.Error())
 		}
@@ -108,6 +110,9 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 		})
 		dir, err = os.MkdirTemp("", "repository")
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() {
+			os.RemoveAll(dir)
+		})
 		repo, err = git.PlainInit(dir, false)
 		Expect(err).ToNot(HaveOccurred())
 		config, err = repo.Config()
