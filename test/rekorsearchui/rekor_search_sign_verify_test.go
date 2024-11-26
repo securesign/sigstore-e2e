@@ -83,8 +83,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 	}
 
 	BeforeAll(func() {
-		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm)
-		err = testsupport.CheckMandatoryAPIConfigValues(api.RekorUIURL)
+		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm, api.RekorUIURL)
 		if err != nil {
 			Skip("Skip this test - " + err.Error())
 		}
