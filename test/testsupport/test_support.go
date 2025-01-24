@@ -84,6 +84,10 @@ func DestroyPrerequisites() error {
 }
 
 func GetOIDCToken(ctx context.Context, issuerURL string, userName string, password string, realm string) (string, error) {
+	if token := api.GetValueFor(api.OidcIssuerURL); token != "" {
+		return token, nil
+	}
+
 	urlString := issuerURL + "/protocol/openid-connect/token"
 
 	client := &http.Client{}

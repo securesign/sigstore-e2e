@@ -8,6 +8,7 @@ const (
 	RekorUIURL       = "SIGSTORE_REKOR_UI_URL"
 	TufURL           = "TUF_URL"
 	OidcIssuerURL    = "SIGSTORE_OIDC_ISSUER"
+	OidcToken        = "SIGSTORE_OIDC_TOKEN"
 	OidcRealm        = "KEYCLOAK_REALM"
 	GithubToken      = "TEST_GITHUB_TOKEN" // #nosec G101: Potential hardcoded credentials (gosec)
 	GithubUsername   = "TEST_GITHUB_USER"
