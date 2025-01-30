@@ -3,7 +3,7 @@ module github.com/securesign/sigstore-e2e
 go 1.21
 
 require (
-	github.com/docker/docker v27.1.1+incompatible
+	github.com/docker/docker v27.5.1+incompatible
 	github.com/go-git/go-git/v5 v5.9.0
 	github.com/google/go-containerregistry v0.20.2
 	github.com/google/uuid v1.6.0
@@ -19,7 +19,13 @@ require (
 	sigs.k8s.io/controller-runtime v0.15.2
 )
 
-require k8s.io/api v0.27.4 // indirect
+require (
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24 // indirect
+	github.com/moby/sys/userns v0.1.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.19.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.19.0 // indirect
+	k8s.io/api v0.27.4 // indirect
+)
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
@@ -29,7 +35,6 @@ require (
 	github.com/acomagu/bufpipe v1.0.4 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cloudflare/circl v1.3.3 // indirect
-	github.com/containerd/containerd v1.7.18 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect

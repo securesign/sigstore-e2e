@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestCosignTest(t *testing.T) {
+func TestTrillianTest(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Test Trillian Tree")
 }
