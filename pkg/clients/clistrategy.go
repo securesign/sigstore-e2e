@@ -144,10 +144,10 @@ func ExtractFromContainer(image string, path string) SetupStrategy {
 	}
 }
 
-func DownloadFromCLIServer(serverURL string) SetupStrategy {
+func DownloadFromCLIServer(serverDomainURL string) SetupStrategy {
 	return func(ctx context.Context, c *cli) (string, error) {
-		logrus.Info("Getting binary '", c.Name, "' from CLI server", "Server URL", serverURL)
-		link := fmt.Sprintf("https://%s/clients/%s/%s-%s.gz", serverURL, runtime.GOOS, c.Name, runtime.GOARCH)
+		logrus.Info("Getting binary '", c.Name, "' from CLI server", "Server URL", serverDomainURL)
+		link := fmt.Sprintf("%s/clients/%s/%s-%s.gz", serverDomainURL, runtime.GOOS, c.Name, runtime.GOARCH)
 		return downloadFromLink(ctx, c, link)
 	}
 }
