@@ -1,6 +1,7 @@
 package cosign
 
 import (
+	"encoding/base64"
 	"io"
 	"net/http"
 	"os"
@@ -67,7 +68,7 @@ var _ = Describe("TSA test", Ordered, func() {
 
 			Expect(dockerCli.ImageTag(testsupport.TestContext, tsaTestImage, tsaTargetImageName)).To(Succeed())
 			var push io.ReadCloser
-			push, err = dockerCli.ImagePush(testsupport.TestContext, tsaTargetImageName, image.PushOptions{})
+			push, err = dockerCli.ImagePush(testsupport.TestContext, tsaTargetImageName, image.PushOptions{RegistryAuth: base64.StdEncoding.EncodeToString([]byte("{}"))})
 			Expect(err).ToNot(HaveOccurred())
 			_, err = io.Copy(os.Stdout, push)
 			Expect(err).ToNot(HaveOccurred())
