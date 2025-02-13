@@ -102,7 +102,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 	Describe("cosign sign", func() {
 		It("should sign the container", func() {
-			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.GetValueFor(api.OidcIssuerURL), "jdoe", "secure", api.GetValueFor(api.OidcRealm))
+			token, err := testsupport.GetOIDCToken(testsupport.TestContext)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cosign.Command(testsupport.TestContext, "sign", "-y", "--identity-token="+token, targetImageName).Run()).To(Succeed())
 		})
@@ -110,7 +110,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 	Describe("cosign verify", func() {
 		It("should verify the signature and extract logIndex", func() {
-			output, err := cosign.CommandOutput(testsupport.TestContext, "verify", "--certificate-identity-regexp", ".*@redhat", "--certificate-oidc-issuer-regexp", ".*keycloak.*", targetImageName)
+			output, err := cosign.CommandOutput(testsupport.TestContext, "verify", "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), targetImageName)
 			Expect(err).ToNot(HaveOccurred())
 
 			startIndex := strings.Index(string(output), "[")
@@ -199,7 +199,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 		})
 
 		It("should sign and attach the predicate as an attestation to the image", func() {
-			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.GetValueFor(api.OidcIssuerURL), "jdoe", "secure", api.GetValueFor(api.OidcRealm))
+			token, err := testsupport.GetOIDCToken(testsupport.TestContext)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(cosign.Command(testsupport.TestContext, "attest", "-y", "--identity-token="+token, "--fulcio-url="+api.GetValueFor(api.FulcioURL), "--rekor-url="+api.GetValueFor(api.RekorURL), "--oidc-issuer="+api.GetValueFor(api.OidcIssuerURL), "--predicate", predicatePath, "--type", "slsaprovenance", targetImageName).Run()).To(Succeed())
@@ -245,7 +245,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 	Describe("ec validate", func() {
 		It("should verify signature and attestation of the image", func() {
-			output, err := ec.CommandOutput(testsupport.TestContext, "validate", "image", "--image", targetImageName, "--certificate-identity-regexp", ".*@redhat", "--certificate-oidc-issuer-regexp", ".*keycloak.*", "--output", "yaml", "--show-successes")
+			output, err := ec.CommandOutput(testsupport.TestContext, "validate", "image", "--image", targetImageName, "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), "--output", "yaml", "--show-successes")
 			Expect(err).ToNot(HaveOccurred())
 
 			successPatterns := []*regexp.Regexp{

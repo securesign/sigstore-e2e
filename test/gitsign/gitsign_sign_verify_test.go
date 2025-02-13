@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -73,9 +74,9 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 	})
 
 	Context("With configured git", func() {
-		It("sets the local repository to use 'jdoe@redhat.com' user", func() {
+		It("sets the local repository to use OIDC user", func() {
 			config.User.Name = "John Doe"
-			config.User.Email = "jdoe@redhat.com"
+			config.User.Email = fmt.Sprintf("%s@%s", api.GetValueFor(api.OidcUser), api.GetValueFor(api.OidcUserDomain))
 
 			Expect(repo.SetConfig(config)).To(Succeed())
 		})
@@ -104,10 +105,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		})
 
 		It("gets ID token and makes commit", func() {
-			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.GetValueFor(api.OidcIssuerURL),
-				"jdoe@redhat.com",
-				"secure",
-				api.GetValueFor(api.OidcRealm))
+			token, err := testsupport.GetOIDCToken(testsupport.TestContext)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(token).To(Not(BeEmpty()))
 			Expect(gitsign.GitWithGitSign(testsupport.TestContext, dir, token, "commit", "-S", "-m", "CI commit "+time.Now().String())).To(Succeed())
@@ -136,7 +134,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		When("commiter is authorized", func() {
 			It("should verify HEAD signature by gitsign", func() {
 				cmd := gitsign.Command(testsupport.TestContext, "verify",
-					"--certificate-identity", "jdoe@redhat.com",
+					"--certificate-identity", fmt.Sprintf("%s@%s", api.GetValueFor(api.OidcUser), api.GetValueFor(api.OidcUserDomain)),
 					"--certificate-oidc-issuer", api.GetValueFor(api.OidcIssuerURL),
 					"HEAD")
 

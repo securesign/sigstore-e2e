@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/securesign/sigstore-e2e/pkg/api"
 	"github.com/securesign/sigstore-e2e/test/testsupport"
 	"github.com/sirupsen/logrus"
 )
@@ -38,7 +37,7 @@ func (tm *TokenManager) RefreshToken(ctx context.Context) {
 	defer tm.mu.Unlock()
 
 	var err error
-	tm.token, err = testsupport.GetOIDCToken(ctx, api.GetValueFor(api.OidcIssuerURL), "jdoe", "secure", api.GetValueFor(api.OidcRealm))
+	tm.token, err = testsupport.GetOIDCToken(ctx)
 	if err != nil {
 		logrus.Errorf("failed to get OIDC token %v", err)
 	}

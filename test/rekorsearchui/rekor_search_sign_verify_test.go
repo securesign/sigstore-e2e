@@ -119,7 +119,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 
 		// configure git user
 		config.User.Name = "John Doe"
-		config.User.Email = "jdoe@redhat.com"
+		config.User.Email = fmt.Sprintf("%s@%s", api.GetValueFor(api.OidcUser), api.GetValueFor(api.OidcUserDomain))
 
 		// configure gitsign
 		config.Raw.AddOption("commit", "", "gpgsign", "true")
@@ -143,8 +143,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		// sign commit with gitsign
-		token, err := testsupport.GetOIDCToken(testsupport.TestContext,
-			api.GetValueFor(api.OidcIssuerURL), "jdoe@redhat.com", "secure", api.GetValueFor(api.OidcRealm))
+		token, err := testsupport.GetOIDCToken(testsupport.TestContext)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(token).To(Not(BeEmpty()))
 
