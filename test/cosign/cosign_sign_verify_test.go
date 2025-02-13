@@ -82,7 +82,8 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 			Expect(dockerCli.ImageTag(testsupport.TestContext, testImage, targetImageName)).To(Succeed())
 			var push io.ReadCloser
-			push, err = dockerCli.ImagePush(testsupport.TestContext, targetImageName, image.PushOptions{})
+			// use empty auth to avoid  "invalid X-Registry-Auth header: EOF" (https://github.com/moby/moby/issues/10983
+			push, err = dockerCli.ImagePush(testsupport.TestContext, targetImageName, image.PushOptions{RegistryAuth: base64.StdEncoding.EncodeToString([]byte("{}"))})
 			Expect(err).ToNot(HaveOccurred())
 			_, err = io.Copy(os.Stdout, push)
 			Expect(err).ToNot(HaveOccurred())

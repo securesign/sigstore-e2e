@@ -1,9 +1,34 @@
 #!/bin/bash
+
+if [ -z "$OIDC_ISSUER_URL" ]; then
+  export OIDC_ISSUER_URL=https://$(oc get route keycloak -n keycloak-system | tail -n 1 | awk '{print $2}')/auth/realms/trusted-artifact-signer
+fi
+
+if [ -z "$TUF_URL" ]; then
+  export TUF_URL=$(oc get tuf -o jsonpath='{.items[0].status.url}')
+fi
+
+if [ -z "$FULCIO_URL" ]; then
+  export COSIGN_FULCIO_URL=$(oc get fulcio -o jsonpath='{.items[0].status.url}')
+  else
+    export COSIGN_FULCIO_URL=$FULCIO_URL
+fi
+
+if [ -z "$REKOR_URL" ]; then
+  export COSIGN_REKOR_URL=$(oc get rekor -o jsonpath='{.items[0].status.url}')
+  else
+    export COSIGN_REKOR_URL=$REKOR_URL
+fi
+
+if [ -z "$REKOR_UI_URL" ]; then
+  export REKOR_UI_URL=$(oc get rekor -o jsonpath='{.items[0].status.rekorSearchUIUrl}')
+fi
+
+if [ -z "$TSA_URL" ]; then
+  export TSA_URL=$(oc get timestampauthorities -o jsonpath='{.items[0].status.url}')/api/v1/timestamp
+fi
+
 # Export the environment variables for the current session
-export TUF_URL=$(oc get tuf -o jsonpath='{.items[0].status.url}')
-export OIDC_ISSUER_URL=https://$(oc get route keycloak -n keycloak-system | tail -n 1 | awk '{print $2}')/auth/realms/trusted-artifact-signer
-export COSIGN_FULCIO_URL=$(oc get fulcio -o jsonpath='{.items[0].status.url}')
-export COSIGN_REKOR_URL=$(oc get rekor -o jsonpath='{.items[0].status.url}')
 export COSIGN_MIRROR=$TUF_URL
 export COSIGN_ROOT=$TUF_URL/root.json
 export COSIGN_OIDC_CLIENT_ID="trusted-artifact-signer"
@@ -15,8 +40,6 @@ export SIGSTORE_OIDC_ISSUER=$COSIGN_OIDC_ISSUER
 export SIGSTORE_REKOR_URL=$COSIGN_REKOR_URL
 export REKOR_REKOR_SERVER=$COSIGN_REKOR_URL
 export SIGSTORE_OIDC_CLIENT_ID=trusted-artifact-signer
-export TSA_URL=$(oc get timestampauthorities -o jsonpath='{.items[0].status.url}')/api/v1/timestamp
-export REKOR_UI_URL=$(oc get rekor -o jsonpath='{.items[0].status.rekorSearchUIUrl}')
 export SIGSTORE_REKOR_UI_URL=$REKOR_UI_URL
 
 # Print the environment variables to verify they are set
