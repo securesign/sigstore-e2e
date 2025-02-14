@@ -28,10 +28,14 @@ if [ -z "$TSA_URL" ]; then
   export TSA_URL=$(oc get timestampauthorities -o jsonpath='{.items[0].status.url}')/api/v1/timestamp
 fi
 
+if [ -z "$OIDC_CLIENT_ID" ]; then
+  OIDC_CLIENT_ID="trusted-artifact-signer"
+fi
+
 # Export the environment variables for the current session
 export COSIGN_MIRROR=$TUF_URL
 export COSIGN_ROOT=$TUF_URL/root.json
-export COSIGN_OIDC_CLIENT_ID="trusted-artifact-signer"
+export COSIGN_OIDC_CLIENT_ID=$OIDC_CLIENT_ID
 export COSIGN_OIDC_ISSUER=$OIDC_ISSUER_URL
 export COSIGN_CERTIFICATE_OIDC_ISSUER=$OIDC_ISSUER_URL
 export COSIGN_YES="true"
@@ -39,7 +43,7 @@ export SIGSTORE_FULCIO_URL=$COSIGN_FULCIO_URL
 export SIGSTORE_OIDC_ISSUER=$COSIGN_OIDC_ISSUER
 export SIGSTORE_REKOR_URL=$COSIGN_REKOR_URL
 export REKOR_REKOR_SERVER=$COSIGN_REKOR_URL
-export SIGSTORE_OIDC_CLIENT_ID=trusted-artifact-signer
+export SIGSTORE_OIDC_CLIENT_ID=$OIDC_CLIENT_ID
 export SIGSTORE_REKOR_UI_URL=$REKOR_UI_URL
 
 # Print the environment variables to verify they are set

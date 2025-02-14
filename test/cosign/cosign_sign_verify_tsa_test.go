@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/docker/docker/api/types/image"
 
@@ -37,7 +38,7 @@ var _ = Describe("TSA test", Ordered, func() {
 		logrus.Infof("Starting TSA cosign test")
 		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm)
 		if err != nil {
-			Skip("Skip this test - " + err.Error())
+			Fail(err.Error())
 		}
 
 		cosign = clients.NewCosign()
@@ -87,7 +88,7 @@ var _ = Describe("TSA test", Ordered, func() {
 
 	Describe("cosign sign tsa", func() {
 		It("should sign the container using TSA", func() {
-			token, err := testsupport.GetOIDCToken(testsupport.TestContext, api.GetValueFor(api.OidcIssuerURL), "jdoe", "secure", api.GetValueFor(api.OidcRealm))
+			token, err := testsupport.GetOIDCToken(testsupport.TestContext)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cosign.Command(testsupport.TestContext, "sign", "-y", "--timestamp-server-url", api.GetValueFor(api.TsaURL), "--identity-token="+token, tsaTargetImageName).Run()).To(Succeed())
 		})
@@ -114,7 +115,7 @@ var _ = Describe("TSA test", Ordered, func() {
 
 	Describe("cosign verify tsa", func() {
 		It("should verify the signature using TSA", func() {
-			Expect(cosign.Command(testsupport.TestContext, "verify", "--timestamp-certificate-chain", tsaChainPath, "--certificate-identity-regexp", ".*@redhat", "--certificate-oidc-issuer-regexp", ".*keycloak.*", tsaTargetImageName).Run()).To(Succeed())
+			Expect(cosign.Command(testsupport.TestContext, "verify", "--timestamp-certificate-chain", tsaChainPath, "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), tsaTargetImageName).Run()).To(Succeed())
 		})
 	})
 })

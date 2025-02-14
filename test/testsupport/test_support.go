@@ -83,15 +83,19 @@ func DestroyPrerequisites() error {
 	return nil
 }
 
-func GetOIDCToken(ctx context.Context, issuerURL string, userName string, password string, realm string) (string, error) {
-	urlString := issuerURL + "/protocol/openid-connect/token"
+func GetOIDCToken(ctx context.Context) (string, error) {
+	if token := api.GetValueFor(api.OidcToken); token != "" {
+		logrus.Info("Using OIDC token from ENV var")
+		return token, nil
+	}
+	urlString := api.GetValueFor(api.OidcIssuerURL) + "/protocol/openid-connect/token"
 
 	client := &http.Client{}
 	data := url.Values{}
-	data.Set("username", userName)
-	data.Set("password", password)
+	data.Set("username", api.GetValueFor(api.OidcUser))
+	data.Set("password", api.GetValueFor(api.OidcPassword))
 	data.Set("scope", "openid")
-	data.Set("client_id", realm)
+	data.Set("client_id", api.GetValueFor(api.OidcRealm))
 	data.Set("grant_type", "password")
 
 	r, _ := http.NewRequestWithContext(ctx, http.MethodPost, urlString, strings.NewReader(data.Encode())) // URL-encoded payload

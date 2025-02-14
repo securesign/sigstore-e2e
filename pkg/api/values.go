@@ -8,6 +8,10 @@ const (
 	RekorUIURL       = "SIGSTORE_REKOR_UI_URL"
 	TufURL           = "TUF_URL"
 	OidcIssuerURL    = "SIGSTORE_OIDC_ISSUER"
+	OidcToken        = "OIDC_TOKEN"
+	OidcUser         = "OIDC_USER"
+	OidcPassword     = "OIDC_PASSWORD"
+	OidcUserDomain   = "OIDC_USER_DOMAIN"
 	OidcRealm        = "KEYCLOAK_REALM"
 	GithubToken      = "TEST_GITHUB_TOKEN" // #nosec G101: Potential hardcoded credentials (gosec)
 	GithubUsername   = "TEST_GITHUB_USER"
@@ -33,6 +37,9 @@ func init() {
 	Values = viper.New()
 
 	Values.SetDefault(OidcRealm, "trusted-artifact-signer")
+	Values.SetDefault(OidcUser, "jdoe")
+	Values.SetDefault(OidcPassword, "secure")
+	Values.SetDefault(OidcUserDomain, "redhat.com")
 	Values.SetDefault(GithubUsername, "ignore")
 	Values.SetDefault(GithubOwner, "securesign")
 	Values.SetDefault(GithubRepo, "e2e-gitsign-test")
