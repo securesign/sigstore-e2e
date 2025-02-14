@@ -47,7 +47,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 		logrus.Infof("Starting cosign test")
 		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm)
 		if err != nil {
-			Skip("Skip this test - " + err.Error())
+			Fail(err.Error())
 		}
 
 		cosign = clients.NewCosign()

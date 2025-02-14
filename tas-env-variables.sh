@@ -28,10 +28,6 @@ if [ -z "$TSA_URL" ]; then
   export TSA_URL=$(oc get timestampauthorities -o jsonpath='{.items[0].status.url}')/api/v1/timestamp
 fi
 
-if [ -z "$TSA_URL" ]; then
-  export TSA_URL=$(oc get timestampauthorities -o jsonpath='{.items[0].status.url}')/api/v1/timestamp
-fi
-
 if [ -z "$OIDC_CLIENT_ID" ]; then
   OIDC_CLIENT_ID="trusted-artifact-signer"
 fi

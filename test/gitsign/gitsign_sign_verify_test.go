@@ -45,7 +45,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 	BeforeAll(func() {
 		err = testsupport.CheckAnyTestMandatoryAPIConfigValues()
 		if err != nil {
-			Skip("Skip this test - " + err.Error())
+			Fail(err.Error())
 		}
 
 		Expect(testsupport.InstallPrerequisites(

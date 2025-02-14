@@ -38,7 +38,7 @@ var _ = Describe("TSA test", Ordered, func() {
 		logrus.Infof("Starting TSA cosign test")
 		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm)
 		if err != nil {
-			Skip("Skip this test - " + err.Error())
+			Fail(err.Error())
 		}
 
 		cosign = clients.NewCosign()

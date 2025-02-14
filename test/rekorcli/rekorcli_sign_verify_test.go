@@ -35,7 +35,7 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 	BeforeAll(func() {
 		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm)
 		if err != nil {
-			Skip("Skip this test - " + err.Error())
+			Fail(err.Error())
 		}
 
 		rekorCli = clients.NewRekorCli()

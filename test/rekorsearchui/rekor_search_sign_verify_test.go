@@ -85,7 +85,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 	BeforeAll(func() {
 		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm, api.RekorUIURL)
 		if err != nil {
-			Skip("Skip this test - " + err.Error())
+			Fail(err.Error())
 		}
 
 		rekorCli = clients.NewRekorCli()
