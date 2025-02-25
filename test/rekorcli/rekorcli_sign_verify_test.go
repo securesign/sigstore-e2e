@@ -101,10 +101,10 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 					if len(fields) == 2 {
 						key := strings.TrimSpace(fields[0])
 						value := strings.TrimSpace(fields[1])
-						switch key {
-						case "Entry Hash":
+
+						if strings.HasPrefix(key, "Entry Hash") {
 							rekorVerifyOutput.RekorHash = value
-						case "Entry Index":
+						} else if strings.HasPrefix(key, "Entry Index") {
 							entryIndex, err := strconv.Atoi(value)
 							if err != nil {
 								// Handle error
