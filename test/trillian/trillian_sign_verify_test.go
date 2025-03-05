@@ -3,7 +3,6 @@ package trillian
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,15 +20,17 @@ import (
 )
 
 var (
-	rekorCli      *clients.RekorCli
-	rekorURL      string
-	currentTreeID string
-	newTreeID     string
-	newID         string
-	testDir       string
-	shardLength   string
-	publicKey     string
-	err           error
+	rekorCli       *clients.RekorCli
+	updateTree     *clients.UpdateTree
+	createTree     *clients.CreateTree
+	rekorURL       string
+	trillianServer string
+	currentTreeID  string
+	newTreeID      string
+	testDir        = "test"
+	shardLength    string
+	publicKey      string
+	err            error
 )
 
 var _ = Describe("Trillian tools - CreateTree and UpdateTree", Ordered, func() {
@@ -40,9 +41,13 @@ var _ = Describe("Trillian tools - CreateTree and UpdateTree", Ordered, func() {
 		}
 
 		rekorCli = clients.NewRekorCli()
+		updateTree = clients.NewUpdateTree()
+		createTree = clients.NewCreateTree()
 
 		Expect(testsupport.InstallPrerequisites(
 			rekorCli,
+			updateTree,
+			createTree,
 		)).To(Succeed())
 
 		DeferCleanup(func() {
@@ -56,13 +61,24 @@ var _ = Describe("Trillian tools - CreateTree and UpdateTree", Ordered, func() {
 		rekorURL = api.GetValueFor(api.RekorURL)
 	})
 
+	Describe("Start port-forwarding to Trillian server", func() {
+		It("should start port-forwarding", func() {
+			trillianServer = "trillian-logserver:8091" // port forward to trillian-logserver service
+			cmd := exec.Command("oc", "port-forward", "svc/trillian-logserver", "8091:8091")
+			cmd.Stdout = GinkgoWriter
+			cmd.Stderr = GinkgoWriter
+			err = cmd.Start()
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
 	Describe("Get current tree ID", func() {
 		It("should retrieve and validate tree ID", func() {
 			output, err := rekorCli.CommandOutput(testsupport.TestContext, "loginfo", "--rekor_server", rekorURL, "--format", "json")
 			Expect(err).NotTo(HaveOccurred())
 
 			outputStr := strings.TrimSpace(string(output))
-			startIdx := strings.LastIndex(outputStr, "{")
+			startIdx := strings.Index(outputStr, "{")
 
 			if startIdx == -1 {
 				Fail("No JSON object found in response")
@@ -86,37 +102,6 @@ var _ = Describe("Trillian tools - CreateTree and UpdateTree", Ordered, func() {
 
 			Expect(currentTreeID).NotTo(BeEmpty())
 			fmt.Println("Current TreeID:", currentTreeID)
-		})
-	})
-
-	Describe("Set tree state to DRAINING", func() {
-		It("should update tree state", func() {
-			cmd := fmt.Sprintf("oc run --image registry.redhat.io/rhtas/updatetree-rhel9@sha256:1a95a2061b9bc0613087903425d84024ce10e00bc6110303a75637fb15d95d34 --restart=Never --attach=true --rm=true -q -- updatetree --admin_server=trillian-logserver:8091 --tree_id=%s --tree_state=DRAINING", currentTreeID)
-			out, err := exec.Command("bash", "-c", cmd).CombinedOutput()
-			if err != nil {
-				fmt.Printf("Command failed with error: %v\n", err)
-			}
-			fmt.Printf("Command output: %s\n", string(out))
-			Expect(err).NotTo(HaveOccurred())
-		})
-	})
-
-	Describe("Set tree state to FROZEN", func() {
-		It("should freeze the tree", func() {
-			freezeCmd := exec.Command("oc", "run",
-				"--image", "registry.redhat.io/rhtas/updatetree-rhel9@sha256:1a95a2061b9bc0613087903425d84024ce10e00bc6110303a75637fb15d95d34",
-				"--restart=Never",
-				"--attach=true",
-				"--rm=true",
-				"-q",
-				"--",
-				"updatetree",
-				"--admin_server=trillian-logserver:8091",
-				fmt.Sprintf("--tree_id=%s", currentTreeID),
-				"--tree_state=FROZEN",
-			)
-			err := freezeCmd.Run()
-			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
@@ -165,29 +150,35 @@ var _ = Describe("Trillian tools - CreateTree and UpdateTree", Ordered, func() {
 		})
 	})
 
-	Describe("Create new Merkle tree", func() {
-		It("should create tree", func() {
-			createCmd := exec.Command("oc", "run",
-				"createtree",
-				"--image", "registry.redhat.io/rhtas/createtree-rhel9@sha256:f66a707e68fb0cdcfcddc318407fe60d72f50a7b605b5db55743eccc14a422ba",
-				"--restart=Never",
-				"--attach=true",
-				"--rm=true",
-				"-q",
-				"--",
-				"-logtostderr=false",
-				"--admin_server=trillian-logserver:8091",
-				"--display_name=rekor-tree",
-			)
-			output, err := createCmd.Output()
+	// create new tree for testing
+	Describe("Create a new Trillian tree", func() {
+		It("Should create a new Trillian tree", func() {
+			trillianServer := "localhost:8091"
+			output, err := createTree.CommandOutput(testsupport.TestContext, "--admin_server", trillianServer, "tree_state", "ACTIVE", "--max_root_duration", "3600s")
 			Expect(err).NotTo(HaveOccurred())
+			outputStr := strings.TrimSpace(string(output))
+			startIdx := strings.Index(outputStr, "{")
 
-			newTreeID = strings.TrimSpace(string(output))
+			if startIdx == -1 {
+				Fail("No JSON object found in response")
+			}
+			treeIDStart := strings.Index(outputStr, "Initialised Log (")
+			if treeIDStart == -1 {
+				Fail("TreeID not found in response")
+			}
+			treeIDStart += len("Initialised Log (")
+			treeIDEnd := strings.Index(outputStr[treeIDStart:], ")")
+			if treeIDEnd == -1 {
+				Fail("TreeID end not found in response")
+			}
+			newTreeID = outputStr[treeIDStart : treeIDStart+treeIDEnd]
+			fmt.Println("New TreeID:", newTreeID)
 			Expect(newTreeID).NotTo(BeEmpty())
-			fmt.Print("new TreeID: " + newTreeID + "\n")
+
 		})
 	})
 
+	// patching securesign with new tree to manipulate with new tree
 	Describe("Generate JSON Patch and Apply OpenShift Patch", func() {
 		It("should create a JSON patch and apply it", func() {
 			newID, err := strconv.Atoi(newTreeID)
@@ -237,43 +228,56 @@ var _ = Describe("Trillian tools - CreateTree and UpdateTree", Ordered, func() {
 			fmt.Println("OpenShift Patch Output:\n", string(output))
 
 			Expect(err).NotTo(HaveOccurred())
+			time.Sleep(10 * time.Second) // waiting for the patch to be applied
+		})
+
+	})
+
+	// updating the new created tree by frozing it
+	Describe("Update the Trillian tree", func() {
+		It("Should update the Trillian tree", func() {
+			trillianServer := "localhost:8091"
+			output, err := updateTree.CommandOutput(testsupport.TestContext, "--admin_server", trillianServer, "--tree_id", newTreeID, "--tree_state", "FROZEN", "--print")
+			fmt.Println(newTreeID)
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println(output)
 		})
 	})
 
+	// verify the new tree
 	Describe("Verify new tree", func() {
 		It("should confirm tree is active", func() {
-			Eventually(func() bool {
-				// rekor server pod has not been available after createTree for some reason
-				fmt.Println("Checking Rekor server availability...")
-
-				resp, err := http.Get(rekorURL + "/api/v1/log")
-				if err != nil {
-					fmt.Println("Rekor server not ready yet, retrying...")
-					return false
-				}
-				defer resp.Body.Close()
-
-				return resp.StatusCode == http.StatusOK
-			}, 3*time.Minute, 10*time.Second).Should(BeTrue(), "Rekor server did not become available")
 			Eventually(func() string {
-				output, err := rekorCli.CommandOutput(testsupport.TestContext, "loginfo", "--rekor_server", rekorURL, "--format", "json")
+				fmt.Printf("Attempting to get loginfo from: %s\n", rekorURL)
+
+				output, err := rekorCli.CommandOutput(testsupport.TestContext, "loginfo", "--rekor_server", rekorURL)
 				if err != nil {
+					fmt.Printf("Error running loginfo command: %v\n", err)
 					return ""
 				}
-
-				var logInfo map[string]interface{}
-				if err = json.Unmarshal([]byte(output), &logInfo); err != nil {
-					return ""
+				fmt.Printf("loginfo output: %s\n", output)
+				lines := strings.Split(string(output), "\n")
+				for _, line := range lines {
+					if strings.Contains(line, "TreeID:") {
+						parts := strings.Split(line, ":")
+						if len(parts) > 1 {
+							treeID := strings.TrimSpace(parts[1])
+							return treeID
+						}
+					}
 				}
 
-				return logInfo["TreeID"].(string)
-			}, "1m", "10s").Should(Equal(newID)) // making sure everything is ready and waiting
+				fmt.Println("Could not extract TreeID from output")
+				return ""
+			}, "30s", "10s").Should(Equal(newTreeID), "TreeID does not match expected value")
 		})
 	})
 
 })
-
 var _ = AfterSuite(func() {
 	// Cleanup shared resources after all tests have run.
+	pkillCmd := exec.Command("pkill", "-f", "oc port-forward")
+	pkillCmd.Run()
+
 	Expect(os.RemoveAll(testDir)).To(Succeed())
 })
