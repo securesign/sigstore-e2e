@@ -154,7 +154,7 @@ var _ = Describe("Trillian tools - CreateTree and UpdateTree", Ordered, func() {
 	Describe("Create a new Trillian tree", func() {
 		It("Should create a new Trillian tree", func() {
 			trillianServer := "localhost:8091"
-			output, err := createTree.CommandOutput(testsupport.TestContext, "--admin_server", trillianServer, "tree_state", "ACTIVE", "--max_root_duration", "3600s")
+			output, err := createTree.CommandOutput(testsupport.TestContext, "--admin_server", trillianServer, "--max_root_duration", "3600s")
 			Expect(err).NotTo(HaveOccurred())
 			outputStr := strings.TrimSpace(string(output))
 			startIdx := strings.Index(outputStr, "{")
@@ -255,7 +255,6 @@ var _ = Describe("Trillian tools - CreateTree and UpdateTree", Ordered, func() {
 					fmt.Printf("Error running loginfo command: %v\n", err)
 					return ""
 				}
-				fmt.Printf("loginfo output: %s\n", output)
 				lines := strings.Split(string(output), "\n")
 				for _, line := range lines {
 					if strings.Contains(line, "TreeID:") {
