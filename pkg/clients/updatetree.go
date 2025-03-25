@@ -9,6 +9,6 @@ func NewUpdateTree() *UpdateTree {
 		&cli{
 			Name:           "updatetree",
 			setupStrategy:  PreferredSetupStrategy(),
-			versionCommand: "version",
+			versionCommand: "",
 		}}
 }

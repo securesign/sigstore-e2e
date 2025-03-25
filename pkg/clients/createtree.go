@@ -9,6 +9,6 @@ func NewCreateTree() *CreateTree {
 		&cli{
 			Name:           "createtree",
 			setupStrategy:  PreferredSetupStrategy(),
-			versionCommand: "version",
+			versionCommand: "",
 		}}
 }
