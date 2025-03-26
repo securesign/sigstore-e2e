@@ -42,7 +42,7 @@ var _ = Describe("Trillian tools - CreateTree and UpdateTree", Ordered, func() {
 
 			output, err := createTree.CommandOutput(testsupport.TestContext, "--help")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(output).To(ContainSubstring("Usage of ")) //just to make sure output appeared
+			Expect(output).To(ContainSubstring("Usage of ")) // just to make sure output appeared
 		})
 	})
 
@@ -51,7 +51,7 @@ var _ = Describe("Trillian tools - CreateTree and UpdateTree", Ordered, func() {
 
 			output, err := updateTree.CommandOutput(testsupport.TestContext, "--help")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(output).To(ContainSubstring("Usage of ")) //just to make sure output appeared
+			Expect(output).To(ContainSubstring("Usage of ")) // just to make sure output appeared
 		})
 	})
 })
