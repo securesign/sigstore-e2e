@@ -1,9 +1,12 @@
 # Get the URLs and export them as environment variables
-$TUF_URL = $(oc get tuf -o jsonpath='{.items[0].status.url}' -n trusted-artifact-signer)
+$TUF_URL = $(oc get tuf -o jsonpath='{.items[0].status.url}')
 $OIDC_ROUTE = $(oc get route keycloak -n keycloak-system --template='{{.spec.host}}')
 $OIDC_ISSUER_URL = "https://$OIDC_ROUTE/auth/realms/trusted-artifact-signer"
-$COSIGN_FULCIO_URL = $(oc get fulcio -o jsonpath='{.items[0].status.url}' -n trusted-artifact-signer)
-$COSIGN_REKOR_URL = $(oc get rekor -o jsonpath='{.items[0].status.url}' -n trusted-artifact-signer)
+$COSIGN_FULCIO_URL = $(oc get fulcio -o jsonpath='{.items[0].status.url}')
+$COSIGN_REKOR_URL = $(oc get rekor -o jsonpath='{.items[0].status.url}')
+$TSA = $(oc get timestampauthorities -o jsonpath='{.items[0].status.url}')
+$TSA_URL = "$TSA/api/v1/timestamp"
+$REKOR_UI_URL = $(oc get rekor -o jsonpath='{.items[0].status.rekorSearchUIUrl}')
 
 # Print the URLs
 Write-Output "TUF_URL: $TUF_URL"
@@ -28,6 +31,8 @@ $env:SIGSTORE_OIDC_ISSUER = $OIDC_ISSUER_URL
 $env:SIGSTORE_REKOR_URL = $COSIGN_REKOR_URL
 $env:REKOR_REKOR_SERVER = $COSIGN_REKOR_URL
 $env:SIGSTORE_OIDC_CLIENT_ID = "trusted-artifact-signer"
+$env:TSA_URL = $TSA_URL
+$env:SIGSTORE_REKOR_UI_URL = $REKOR_UI_URL
 
 # Print the environment variables to verify they are set
 Write-Output "TUF_URL: $env:TUF_URL"
@@ -45,3 +50,5 @@ Write-Output "SIGSTORE_OIDC_ISSUER: $env:SIGSTORE_OIDC_ISSUER"
 Write-Output "SIGSTORE_REKOR_URL: $env:SIGSTORE_REKOR_URL"
 Write-Output "REKOR_REKOR_SERVER: $env:REKOR_REKOR_SERVER"
 Write-Output "SIGSTORE_OIDC_CLIENT_ID: $env:SIGSTORE_OIDC_CLIENT_ID"
+Write-Output "TSA_URL: $env:TSA_URL"
+Write-Output "SIGSTORE_REKOR_UI_URL: $env:SIGSTORE_REKOR_UI_URL"

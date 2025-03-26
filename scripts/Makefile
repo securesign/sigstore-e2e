@@ -37,4 +37,9 @@ test:
 	fi; \
 	go test -v ./test/...
 
-.PHONY: build test all
+tuf-repo:
+	@echo "Running manual TUF repository test..."
+	go test -v ./test/tuftool
+
+.PHONY: build test test-tuf-repo all 
+ 
