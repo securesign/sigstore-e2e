@@ -21,7 +21,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const tsaTestImage string = "alpine:latest"
+const tsaTestImage string = "mirror.gcr.io/alpine:latest"
 
 var tsaTargetImageName string
 var tsaChainPath string
