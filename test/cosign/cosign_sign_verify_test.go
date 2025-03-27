@@ -23,7 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const testImage string = "alpine:latest"
+const testImage string = "mirror.gcr.io/alpine:latest"
 
 var logIndex int
 var hashValue string
