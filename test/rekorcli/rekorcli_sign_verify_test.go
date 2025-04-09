@@ -129,6 +129,19 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 		})
 	})
 
+	Describe("Verify entry consistency", func() {
+		It("should use the same entry across tests", func() {
+			rekorServerURL := api.GetValueFor(api.RekorURL)
+			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--uuid", rekorHash)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(strings.Contains(string(output), rekorHash)).To(BeTrue())
+
+			output, err = rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", strconv.Itoa(entryIndex))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(strings.Contains(string(output), strconv.Itoa(entryIndex))).To(BeTrue())
+		})
+	})
+
 	Describe("Get with UUID", func() {
 		It("should get data from rekor server", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
@@ -164,14 +177,18 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 	Describe("Get loginfo", func() {
 		It("should get loginfo from rekor server", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
-			Expect(rekorCli.Command(testsupport.TestContext, "loginfo", "--rekor_server", rekorServerURL).Run()).To(Succeed())
+			output, err := rekorCli.CommandOutput(testsupport.TestContext, "loginfo", "--rekor_server", rekorServerURL)
+			Expect(err).ToNot(HaveOccurred())
+			fmt.Println(output)
 		})
 	})
 
 	Describe("Search entries", func() {
 		It("should search entries with artifact ", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
-			Expect(rekorCli.Command(testsupport.TestContext, "search", "--rekor_server", rekorServerURL, "--artifact", tarFilePath).Run()).To(Succeed())
+			output, err := rekorCli.CommandOutput(testsupport.TestContext, "search", "--rekor_server", rekorServerURL, "--artifact", tarFilePath)
+			Expect(err).ToNot(HaveOccurred())
+			fmt.Println(output)
 		})
 	})
 
@@ -179,7 +196,9 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 		It("should search entries with public key", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 			rekorKey := "ec_public.pem"
-			Expect(rekorCli.Command(testsupport.TestContext, "search", "--rekor_server", rekorServerURL, "--public-key", rekorKey, "--pki-format=x509").Run()).To(Succeed())
+			output, err := rekorCli.CommandOutput(testsupport.TestContext, "search", "--rekor_server", rekorServerURL, "--public-key", rekorKey, "--pki-format=x509")
+			Expect(err).ToNot(HaveOccurred())
+			fmt.Println(output)
 		})
 
 	})
@@ -187,9 +206,12 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 	Describe("Search entries", func() {
 		It("should search entries with hash", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
-			Expect(rekorCli.Command(testsupport.TestContext, "search", "--rekor_server", rekorServerURL, "--sha", hashWithAlg).Run()).To(Succeed())
+			output, err := rekorCli.CommandOutput(testsupport.TestContext, "search", "--rekor_server", rekorServerURL, "--sha", hashWithAlg)
+			Expect(err).ToNot(HaveOccurred())
+			fmt.Println(output)
 		})
 	})
+
 })
 
 var _ = AfterSuite(func() {
