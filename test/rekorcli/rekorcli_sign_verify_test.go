@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -84,38 +85,26 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 		It("should upload artifact", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 			rekorKey := "ec_public.pem"
-			Expect(rekorCli.Command(testsupport.TestContext, "upload", "--rekor_server", rekorServerURL, "--signature", signatureFilePath, "--pki-format=x509", "--public-key", rekorKey, "--artifact", tarFilePath).Run()).To(Succeed())
+			output, err := rekorCli.CommandOutput(testsupport.TestContext, "upload", "--rekor_server", rekorServerURL, "--signature", signatureFilePath, "--pki-format=x509", "--public-key", rekorKey, "--artifact", tarFilePath)
+			Expect(err).ToNot(HaveOccurred())
+
+			createdMessage := regexp.MustCompile(`Created entry at index (\d+)`)
+			matches := createdMessage.FindStringSubmatch(string(output))
+			Expect(matches).To(HaveLen(2))
+
+			entryIndex, err = strconv.Atoi(matches[1])
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
 	Describe("Verify upload", func() {
 		It("should verify uploaded artifact", func() {
-			parseOutput := func(output string) testsupport.RekorCLIVerifyOutput {
-				var rekorVerifyOutput testsupport.RekorCLIVerifyOutput
-				lines := strings.Split(output, "\n")
-				for _, line := range lines {
-					if line == "" {
-						continue // Skip empty lines
-					}
-					fields := strings.SplitN(line, ": ", 2) // Split by ": "
-					if len(fields) == 2 {
-						key := strings.TrimSpace(fields[0])
-						value := strings.TrimSpace(fields[1])
+			parseOutput := func(output string) string {
+				hashRe := regexp.MustCompile(`Entry Hash:\s+([a-f0-9]+)`)
+				hashMatches := hashRe.FindStringSubmatch(output)
+				Expect(hashMatches).To(HaveLen(2))
 
-						if strings.HasPrefix(key, "Entry Hash") {
-							rekorVerifyOutput.RekorHash = value
-						} else if strings.HasPrefix(key, "Entry Index") {
-							entryIndex, err := strconv.Atoi(value)
-							if err != nil {
-								// Handle error
-								fmt.Println("Error converting Entry Index to int:", err)
-								return rekorVerifyOutput
-							}
-							rekorVerifyOutput.EntryIndex = entryIndex
-						}
-					}
-				}
-				return rekorVerifyOutput
+				return hashMatches[1]
 			}
 
 			rekorServerURL := api.GetValueFor(api.RekorURL)
@@ -123,9 +112,7 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			output, err := rekorCli.CommandOutput(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", signatureFilePath, "--pki-format=x509", "--public-key", rekorKey, "--artifact", tarFilePath)
 			Expect(err).ToNot(HaveOccurred())
 			outputString := string(output)
-			verifyOutput := parseOutput(outputString)
-			rekorHash = verifyOutput.RekorHash
-			entryIndex = verifyOutput.EntryIndex
+			rekorHash = parseOutput(outputString)
 		})
 	})
 
@@ -134,11 +121,13 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--uuid", rekorHash)
 			Expect(err).ToNot(HaveOccurred())
+			Expect(strings.Contains(string(output), strconv.Itoa(entryIndex))).To(BeTrue())
 			Expect(strings.Contains(string(output), rekorHash)).To(BeTrue())
 
 			output, err = rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", strconv.Itoa(entryIndex))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(strings.Contains(string(output), strconv.Itoa(entryIndex))).To(BeTrue())
+			Expect(strings.Contains(string(output), rekorHash)).To(BeTrue())
 		})
 	})
 
