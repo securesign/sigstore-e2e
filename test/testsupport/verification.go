@@ -1,10 +1,5 @@
 package testsupport
 
-type RekorCLIVerifyOutput struct {
-	RekorHash  string
-	EntryIndex int
-}
-
 type RekorCLIGetOutput struct {
 	HashedRekordObj struct {
 		Data struct {
