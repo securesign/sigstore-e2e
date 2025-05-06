@@ -57,11 +57,28 @@ type Browser struct {
 
 func CreateBrowser(browserType BrowserType, headless bool) (*Browser, error) {
 	if os.Getenv("PLAYWRIGHT_SKIP_INSTALL") != "true" {
-		cmd := exec.Command("npx", "playwright", "install", "--with-deps")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
+		// First install the Playwright npm package
+		installCmd := exec.Command("npm", "install", "@playwright/test")
+		installCmd.Stdout = os.Stdout
+		installCmd.Stderr = os.Stderr
+		if err := installCmd.Run(); err != nil {
+			logrus.Warnf("Failed to install Playwright npm package: %v", err)
+		}
+
+		// Then install the browsers
+		browserCmd := exec.Command("npx", "playwright", "install", "--with-deps")
+		browserCmd.Stdout = os.Stdout
+		browserCmd.Stderr = os.Stderr
+		if err := browserCmd.Run(); err != nil {
 			logrus.Warnf("Failed to install playwright browsers: %v", err)
+		}
+
+		// Install the Playwright Go driver
+		driverCmd := exec.Command("go", "run", "github.com/playwright-community/playwright-go/cmd/playwright", "install")
+		driverCmd.Stdout = os.Stdout
+		driverCmd.Stderr = os.Stderr
+		if err := driverCmd.Run(); err != nil {
+			logrus.Warnf("Failed to install playwright driver: %v", err)
 		}
 	}
 
