@@ -63,7 +63,7 @@ func InstallPlaywright() error {
 	installCmd.Stdout = os.Stdout
 	installCmd.Stderr = os.Stderr
 	if err := installCmd.Run(); err != nil {
-		return fmt.Errorf("failed to install Playwright npm package: %v", err)
+		return fmt.Errorf("failed to install Playwright npm package: %w", err)
 	}
 
 	// install the browsers
@@ -71,7 +71,7 @@ func InstallPlaywright() error {
 	browserCmd.Stdout = os.Stdout
 	browserCmd.Stderr = os.Stderr
 	if err := browserCmd.Run(); err != nil {
-		return fmt.Errorf("failed to install playwright browsers: %v", err)
+		return fmt.Errorf("failed to install playwright browsers: %w", err)
 	}
 
 	// install the Playwright Go driver
@@ -79,7 +79,7 @@ func InstallPlaywright() error {
 	driverCmd.Stdout = os.Stdout
 	driverCmd.Stderr = os.Stderr
 	if err := driverCmd.Run(); err != nil {
-		return fmt.Errorf("failed to install playwright driver: %v", err)
+		return fmt.Errorf("failed to install playwright driver: %w", err)
 	}
 
 	logrus.Info("Playwright installation completed successfully")
@@ -113,7 +113,10 @@ func CreateBrowser(browserType BrowserType, headless bool) (*Browser, error) {
 	}
 
 	if err != nil {
-		pw.Stop()
+		stopErr := pw.Stop()
+		if stopErr != nil {
+			logrus.Warnf("error while stopping playwright: %v\n", stopErr)
+		}
 		return nil, fmt.Errorf("could not launch browser: %v", err)
 	}
 
@@ -128,7 +131,10 @@ func CreateBrowser(browserType BrowserType, headless bool) (*Browser, error) {
 	context, err := browserObj.NewContext(contextOptions)
 	if err != nil {
 		browserObj.Close()
-		pw.Stop()
+		stopErr := pw.Stop()
+		if stopErr != nil {
+			logrus.Warnf("error while stopping playwright: %v\n", stopErr)
+		}
 		return nil, fmt.Errorf("could not create browser context: %v", err)
 	}
 
