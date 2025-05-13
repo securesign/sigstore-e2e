@@ -89,7 +89,7 @@ func InstallPlaywright() error {
 func CreateBrowser(browserType BrowserType, headless bool) (*Browser, error) {
 	pw, err := playwright.Run()
 	if err != nil {
-		return nil, fmt.Errorf("could not start playwright: %v", err)
+		return nil, fmt.Errorf("could not start playwright: %w", err)
 	}
 
 	var browserObj playwright.Browser
@@ -113,11 +113,8 @@ func CreateBrowser(browserType BrowserType, headless bool) (*Browser, error) {
 	}
 
 	if err != nil {
-		stopErr := pw.Stop()
-		if stopErr != nil {
-			logrus.Warnf("error while stopping playwright: %v\n", stopErr)
-		}
-		return nil, fmt.Errorf("could not launch browser: %v", err)
+		Expect(pw.Stop()).To(Succeed())
+		return nil, fmt.Errorf("could not launch browser: %w", err)
 	}
 
 	contextOptions := playwright.BrowserNewContextOptions{
@@ -131,11 +128,8 @@ func CreateBrowser(browserType BrowserType, headless bool) (*Browser, error) {
 	context, err := browserObj.NewContext(contextOptions)
 	if err != nil {
 		browserObj.Close()
-		stopErr := pw.Stop()
-		if stopErr != nil {
-			logrus.Warnf("error while stopping playwright: %v\n", stopErr)
-		}
-		return nil, fmt.Errorf("could not create browser context: %v", err)
+		Expect(pw.Stop()).To(Succeed())
+		return nil, fmt.Errorf("could not create browser context: %w", err)
 	}
 
 	if version := browserObj.Version(); version != "" {
@@ -154,7 +148,7 @@ func CreateBrowser(browserType BrowserType, headless bool) (*Browser, error) {
 func (b *Browser) Navigate(url string) error {
 	page, err := b.Context.NewPage()
 	if err != nil {
-		return fmt.Errorf("could not create page: %v", err)
+		return fmt.Errorf("could not create page: %w", err)
 	}
 
 	page.SetDefaultTimeout(30000)
@@ -222,7 +216,7 @@ func (b *Browser) Screenshot(filename string) error {
 	screenshotPath := filepath.Join("screenshots", b.BrowserType.String(), filename)
 	if _, err := os.Stat(filepath.Dir(screenshotPath)); os.IsNotExist(err) {
 		if err := os.MkdirAll(filepath.Dir(screenshotPath), 0755); err != nil {
-			return fmt.Errorf("could not create screenshot directory: %v", err)
+			return fmt.Errorf("could not create screenshot directory: %w", err)
 		}
 	}
 
@@ -281,7 +275,7 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 	logrus.Infof("Starting %s search test", attributeValue)
 
 	// Take initial screenshot
-	browser.Screenshot(fmt.Sprintf("%s-search-initial.png", attributeValue))
+	Expect(browser.Screenshot(fmt.Sprintf("%s-search-initial.png", attributeValue))).To(Succeed())
 
 	// If not using the default email option, select the appropriate option from dropdown
 	if attributeValue != "email" {
@@ -291,22 +285,22 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 		if err := attrLocator.WaitFor(playwright.LocatorWaitForOptions{
 			State: playwright.WaitForSelectorStateVisible,
 		}); err != nil {
-			return fmt.Errorf("failed to wait for attribute dropdown: %v", err)
+			return fmt.Errorf("failed to wait for attribute dropdown: %w", err)
 		}
 
 		if err := attrLocator.Click(); err != nil {
-			return fmt.Errorf("failed to click attribute dropdown: %v", err)
+			return fmt.Errorf("failed to click attribute dropdown: %w", err)
 		}
 
 		selectLocator := browser.Page.Locator("select")
 		if _, err := selectLocator.SelectOption(playwright.SelectOptionValues{
 			Values: &[]string{attributeValue},
 		}); err != nil {
-			return fmt.Errorf("failed to select %s option: %v", attributeValue, err)
+			return fmt.Errorf("failed to select %s option: %w", attributeValue, err)
 		}
 
 		if err := attrLocator.Click(); err != nil {
-			return fmt.Errorf("failed to click attribute dropdown after selection: %v", err)
+			return fmt.Errorf("failed to click attribute dropdown after selection: %w", err)
 		}
 	}
 
@@ -315,18 +309,18 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 	if err := inputLocator.WaitFor(playwright.LocatorWaitForOptions{
 		State: playwright.WaitForSelectorStateVisible,
 	}); err != nil {
-		return fmt.Errorf("failed to wait for input: %v", err)
+		return fmt.Errorf("failed to wait for input: %w", err)
 	}
 
 	logrus.Infof("Filling %s field with: %s", attributeValue, searchValue)
 	if err := inputLocator.Fill(searchValue); err != nil {
-		return fmt.Errorf("failed to input %s: %v", attributeValue, err)
+		return fmt.Errorf("failed to input %s: %w", attributeValue, err)
 	}
 
 	// Verify input value
 	inputValue, err := inputLocator.InputValue()
 	if err != nil {
-		return fmt.Errorf("failed to get input value: %v", err)
+		return fmt.Errorf("failed to get input value: %w", err)
 	}
 
 	if inputValue != searchValue {
@@ -334,12 +328,12 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 	}
 
 	// Take screenshot before search
-	browser.Screenshot(fmt.Sprintf("%s-search-before-click.png", attributeValue))
+	Expect(browser.Screenshot(fmt.Sprintf("%s-search-before-click.png", attributeValue))).To(Succeed())
 
 	// Click search button
 	searchLocator := browser.Page.Locator("#search-form-button")
 	if err := searchLocator.Click(); err != nil {
-		return fmt.Errorf("failed to click search button: %v", err)
+		return fmt.Errorf("failed to click search button: %w", err)
 	}
 
 	logrus.Infof("Executing %s search", attributeValue)
@@ -347,7 +341,7 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 	if err := browser.Page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{
 		State: playwright.LoadStateNetworkidle,
 	}); err != nil {
-		return fmt.Errorf("failed to wait for network idle: %v", err)
+		return fmt.Errorf("failed to wait for network idle: %w", err)
 	}
 
 	if err := browser.Page.Locator(".pf-v5-c-card").
@@ -371,7 +365,7 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 		}
 	}
 
-	browser.Screenshot(fmt.Sprintf("%s-search-results.png", attributeValue))
+	Expect(browser.Screenshot(fmt.Sprintf("%s-search-results.png", attributeValue))).To(Succeed())
 
 	if foundResult {
 		logrus.Infof("Search successful: Found entry with UUID %s", bt.TestData.EntryUUID)
@@ -389,13 +383,13 @@ func (bt *BrowserTest) TestEmailSearch() error {
 
 		uuidErr := bt.performSearch("uuid", `#rekor-search-entry\ uuid`, bt.TestData.EntryUUID)
 		if uuidErr != nil {
-			return fmt.Errorf("both email and UUID searches failed: email error: %v, UUID error: %v", err, uuidErr)
+			return fmt.Errorf("both email and UUID searches failed: email error: %w, UUID error: %w", err, uuidErr)
 		}
 
 		card := bt.Browser.Page.Locator(".pf-v5-c-card").First()
 		cardText, err := card.TextContent()
 		if err != nil {
-			return fmt.Errorf("failed to get card text content: %v", err)
+			return fmt.Errorf("failed to get card text content:  %w", err)
 		}
 
 		if strings.Contains(cardText, bt.TestData.Email) {
@@ -407,13 +401,13 @@ func (bt *BrowserTest) TestEmailSearch() error {
 
 		entryLink := bt.Browser.Page.Locator(`h2 a[href*="` + bt.TestData.EntryUUID + `"]`)
 		if err := entryLink.Click(); err != nil {
-			return fmt.Errorf("failed to click entry link: %v", err)
+			return fmt.Errorf("failed to click entry link: %w", err)
 		}
 
 		if err := bt.Browser.Page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{
 			State: playwright.LoadStateNetworkidle,
 		}); err != nil {
-			return fmt.Errorf("failed to wait for entry details to load: %v", err)
+			return fmt.Errorf("failed to wait for entry details to load: %w", err)
 		}
 
 		emailElement := bt.Browser.Page.Locator(`text=` + bt.TestData.Email)
