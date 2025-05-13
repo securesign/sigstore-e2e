@@ -34,13 +34,13 @@ const (
 func GetBrowsersToTest() []BrowserType {
 	browsersToTest := []BrowserType{Chrome} // Default to Chrome
 
-	if os.Getenv("TEST_FIREFOX") == "true" {
+	if os.Getenv(api.GetValueFor(api.TestFirefox)) == "true" {
 		browsersToTest = append(browsersToTest, Firefox)
 	}
-	if os.Getenv("TEST_SAFARI") == "true" {
+	if os.Getenv(api.GetValueFor(api.TestSafari)) == "true" {
 		browsersToTest = append(browsersToTest, Safari)
 	}
-	if os.Getenv("TEST_EDGE") == "true" {
+	if os.Getenv(api.GetValueFor(api.TestEdge)) == "true" {
 		browsersToTest = append(browsersToTest, Edge)
 	}
 
@@ -55,15 +55,10 @@ type Browser struct {
 	BrowserType BrowserType
 }
 
-// Add this new function
 func InstallPlaywright() error {
-	if os.Getenv("PLAYWRIGHT_SKIP_INSTALL") == "true" {
-		return nil
-	}
-
 	logrus.Info("Installing Playwright dependencies...")
 
-	// First install the Playwright npm package
+	// install the Playwright npm package
 	installCmd := exec.Command("npm", "install", "@playwright/test")
 	installCmd.Stdout = os.Stdout
 	installCmd.Stderr = os.Stderr
@@ -71,7 +66,7 @@ func InstallPlaywright() error {
 		return fmt.Errorf("failed to install Playwright npm package: %v", err)
 	}
 
-	// Then install the browsers
+	// install the browsers
 	browserCmd := exec.Command("npx", "playwright", "install", "--with-deps")
 	browserCmd.Stdout = os.Stdout
 	browserCmd.Stderr = os.Stderr
@@ -79,7 +74,7 @@ func InstallPlaywright() error {
 		return fmt.Errorf("failed to install playwright browsers: %v", err)
 	}
 
-	// Install the Playwright Go driver
+	// install the Playwright Go driver
 	driverCmd := exec.Command("go", "run", "github.com/playwright-community/playwright-go/cmd/playwright", "install")
 	driverCmd.Stdout = os.Stdout
 	driverCmd.Stderr = os.Stderr
@@ -270,11 +265,9 @@ func (bt *BrowserTest) Close() error {
 	return bt.Browser.Close()
 }
 
-// Common search functionality used across all test methods
 func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string) error {
 	browser := bt.Browser
 
-	// Navigate to app URL
 	if err := browser.Navigate(bt.URL); err != nil {
 		return err
 	}
@@ -288,7 +281,6 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 	if attributeValue != "email" {
 		logrus.Infof("Selected search attribute: %s", attributeValue)
 
-		// Find and click attribute dropdown
 		attrLocator := browser.Page.Locator("#rekor-search-attribute")
 		if err := attrLocator.WaitFor(playwright.LocatorWaitForOptions{
 			State: playwright.WaitForSelectorStateVisible,
@@ -296,12 +288,10 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 			return fmt.Errorf("failed to wait for attribute dropdown: %v", err)
 		}
 
-		// Click the dropdown
 		if err := attrLocator.Click(); err != nil {
 			return fmt.Errorf("failed to click attribute dropdown: %v", err)
 		}
 
-		// Select option using Locator
 		selectLocator := browser.Page.Locator("select")
 		if _, err := selectLocator.SelectOption(playwright.SelectOptionValues{
 			Values: &[]string{attributeValue},
@@ -309,7 +299,6 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 			return fmt.Errorf("failed to select %s option: %v", attributeValue, err)
 		}
 
-		// Close the dropdown
 		if err := attrLocator.Click(); err != nil {
 			return fmt.Errorf("failed to click attribute dropdown after selection: %v", err)
 		}
@@ -341,9 +330,6 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 	// Take screenshot before search
 	browser.Screenshot(fmt.Sprintf("%s-search-before-click.png", attributeValue))
 
-	// Record current number of cards to identify new ones later
-	existingCards, _ := browser.Page.Locator(".pf-v5-c-card").Count()
-
 	// Click search button
 	searchLocator := browser.Page.Locator("#search-form-button")
 	if err := searchLocator.Click(); err != nil {
@@ -352,56 +338,49 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 
 	logrus.Infof("Executing %s search", attributeValue)
 
-	// Wait for network to be idle after search
 	if err := browser.Page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{
 		State: playwright.LoadStateNetworkidle,
 	}); err != nil {
 		return fmt.Errorf("failed to wait for network idle: %v", err)
 	}
 
-	// Now check for any new cards containing our UUID
-	timeout := time.Now().Add(30 * time.Second)
-	var foundResult bool
-
-	for time.Now().Before(timeout) {
-		allCards := browser.Page.Locator(".pf-v5-c-card")
-		currentCount, _ := allCards.Count()
-
-		if currentCount > existingCards {
-			for i := 0; i < currentCount; i++ {
-				card := allCards.Nth(i)
-				candUUID, _ := card.Locator("h2 a").TextContent()
-				if candUUID == bt.TestData.EntryUUID {
-					foundResult = true
-					break
-				}
-			}
-			if foundResult {
-				break
-			}
-		}
-		time.Sleep(500 * time.Millisecond)
+	if err := browser.Page.Locator(".pf-v5-c-card").
+		First().
+		WaitFor(playwright.LocatorWaitForOptions{
+			Timeout: playwright.Float(5_000),
+			State:   playwright.WaitForSelectorStateVisible,
+		}); err != nil {
+		logrus.Warnf("No result cards became visible within 5 s – continuing anyway")
 	}
 
-	// Take screenshot after search
+	allCards := browser.Page.Locator(".pf-v5-c-card")
+	cardCount, _ := allCards.Count()
+
+	foundResult := false
+	for i := 0; i < cardCount; i++ {
+		uuidText, _ := allCards.Nth(i).Locator("h2 a").TextContent()
+		if uuidText == bt.TestData.EntryUUID {
+			foundResult = true
+			break
+		}
+	}
+
 	browser.Screenshot(fmt.Sprintf("%s-search-results.png", attributeValue))
 
 	if foundResult {
 		logrus.Infof("Search successful: Found entry with UUID %s", bt.TestData.EntryUUID)
-	} else {
-		return fmt.Errorf("could not find a card with UUID %s", bt.TestData.EntryUUID)
+		return nil
 	}
-
-	return nil
+	return fmt.Errorf("could not find a card with UUID %s", bt.TestData.EntryUUID)
 }
 
 func (bt *BrowserTest) TestEmailSearch() error {
 	err := bt.performSearch("email", "#rekor-search-email", bt.TestData.Email)
 
+	// Fall back to UUID search if the email search fails
 	if err != nil {
 		logrus.Warnf("Email search failed, possibly due to result limit. Falling back to UUID search.")
 
-		// Fall back to UUID search which should be more specific
 		uuidErr := bt.performSearch("uuid", `#rekor-search-entry\ uuid`, bt.TestData.EntryUUID)
 		if uuidErr != nil {
 			return fmt.Errorf("both email and UUID searches failed: email error: %v, UUID error: %v", err, uuidErr)
@@ -420,22 +399,17 @@ func (bt *BrowserTest) TestEmailSearch() error {
 			return nil
 		}
 
-		// UUID search succeeded, now verify this entry has the correct email
-		// Navigate to the entry details page if needed
 		entryLink := bt.Browser.Page.Locator(`h2 a[href*="` + bt.TestData.EntryUUID + `"]`)
 		if err := entryLink.Click(); err != nil {
 			return fmt.Errorf("failed to click entry link: %v", err)
 		}
 
-		// Wait for details page to load
 		if err := bt.Browser.Page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{
 			State: playwright.LoadStateNetworkidle,
 		}); err != nil {
 			return fmt.Errorf("failed to wait for entry details to load: %v", err)
 		}
 
-		// Check if the email appears on the details page
-		// This assumes there's some element containing the email on the details page
 		emailElement := bt.Browser.Page.Locator(`text=` + bt.TestData.Email)
 		if visible, _ := emailElement.IsVisible(); !visible {
 			return fmt.Errorf("entry found by UUID, but email %s not found on details page", bt.TestData.Email)
@@ -446,7 +420,6 @@ func (bt *BrowserTest) TestEmailSearch() error {
 		return nil
 	}
 
-	// Original email search succeeded
 	return nil
 }
 
@@ -629,7 +602,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 				var browserTest *BrowserTest
 
 				BeforeEach(func() {
-					logrus.Infof("=== Starting %s browser test suite ===", bt)
+					logrus.Infof("\n=== Starting %s browser test suite ===", bt)
 
 					headless := api.GetValueFor(api.HeadlessUI) == "true"
 					var err error
@@ -642,7 +615,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 						Expect(browserTest.Close()).To(Succeed())
 					}
 
-					logrus.Infof("=== Completed %s browser test suite ===", bt)
+					logrus.Infof("=== Completed %s browser test suite ===\n", bt)
 				})
 
 				It("should search by email", func() {
