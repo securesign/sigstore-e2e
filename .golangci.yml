@@ -52,3 +52,18 @@ linters:
     - whitespace
     - wrapcheck
     - wsl
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - typecheck
+      text: "undefined: (Fail|Describe|It|Context|BeforeEach|AfterEach|BeforeAll|AfterSuite|When|Expect|DeferCleanup|RegisterFailHandler|RunSpecs|Succeed|playwright|testcontainers|git)"
+    - path: _test\.go
+      linters:
+        - typecheck
+      text: "c\\.(Create|Delete|Get) undefined"
+    - path: _test\.go
+      linters:
+        - typecheck
+      text: "GetClient\\(\\)\\.Get undefined"
