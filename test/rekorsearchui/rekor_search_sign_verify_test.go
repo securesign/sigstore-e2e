@@ -67,8 +67,10 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 	appURL := api.GetValueFor(api.RekorUIURL)
 
 	setup := func() G {
-		headless := api.GetValueFor(api.HeadlessUI) == "true"
-		launch := launcher.New().Headless(headless)
+		launch := launcher.New()
+		if api.GetValueFor(api.HeadlessUI) == "true" {
+			launch = launch.Headless(true).NoSandbox(true)
+		}
 		url := launch.MustLaunch()
 		browser := rod.New().ControlURL(url).MustConnect()
 
