@@ -37,9 +37,12 @@ test:
 	fi; \
 	go test -v ./test/...
 
-tuf-repo:
-	@echo "Running manual TUF repository test..."
-	go test -v ./test/tuftool
+setup:
+	@echo "Installing Playwright dependencies..."
+	@npm install @playwright/test
+	@npx playwright install --with-deps
+	@go run github.com/playwright-community/playwright-go/cmd/playwright install
 
-.PHONY: build test test-tuf-repo all 
+
+.PHONY: build test setup all 
  

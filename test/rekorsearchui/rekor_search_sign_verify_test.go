@@ -34,13 +34,13 @@ const (
 func GetBrowsersToTest() []BrowserType {
 	browsersToTest := []BrowserType{Chrome} // Default to Chrome
 
-	if os.Getenv(api.GetValueFor(api.TestFirefox)) == "true" {
+	if api.GetValueFor(api.TestFirefox) == "true" {
 		browsersToTest = append(browsersToTest, Firefox)
 	}
-	if os.Getenv(api.GetValueFor(api.TestSafari)) == "true" {
+	if api.GetValueFor(api.TestSafari) == "true" {
 		browsersToTest = append(browsersToTest, Safari)
 	}
-	if os.Getenv(api.GetValueFor(api.TestEdge)) == "true" {
+	if api.GetValueFor(api.TestEdge) == "true" {
 		browsersToTest = append(browsersToTest, Edge)
 	}
 
@@ -53,37 +53,6 @@ type Browser struct {
 	Page        playwright.Page
 	Context     playwright.BrowserContext
 	BrowserType BrowserType
-}
-
-func InstallPlaywright() error {
-	logrus.Info("Installing Playwright dependencies...")
-
-	// install the Playwright npm package
-	installCmd := exec.Command("npm", "install", "@playwright/test")
-	installCmd.Stdout = os.Stdout
-	installCmd.Stderr = os.Stderr
-	if err := installCmd.Run(); err != nil {
-		return fmt.Errorf("failed to install Playwright npm package: %w", err)
-	}
-
-	// install the browsers
-	browserCmd := exec.Command("npx", "playwright", "install", "--with-deps")
-	browserCmd.Stdout = os.Stdout
-	browserCmd.Stderr = os.Stderr
-	if err := browserCmd.Run(); err != nil {
-		return fmt.Errorf("failed to install playwright browsers: %w", err)
-	}
-
-	// install the Playwright Go driver
-	driverCmd := exec.Command("go", "run", "github.com/playwright-community/playwright-go/cmd/playwright", "install")
-	driverCmd.Stdout = os.Stdout
-	driverCmd.Stderr = os.Stderr
-	if err := driverCmd.Run(); err != nil {
-		return fmt.Errorf("failed to install playwright driver: %w", err)
-	}
-
-	logrus.Info("Playwright installation completed successfully")
-	return nil
 }
 
 func CreateBrowser(browserType BrowserType, headless bool) (*Browser, error) {
@@ -265,6 +234,74 @@ func (bt *BrowserTest) Close() error {
 	return bt.Browser.Close()
 }
 
+func (bt *BrowserTest) findEntryAcrossPages(targetUUID string, searchAttribute string) error {
+	page := bt.Browser.Page
+	pageNumber := 1
+
+	for {
+		if err := page.Locator(".pf-v5-c-card").First().WaitFor(playwright.LocatorWaitForOptions{
+			State:   playwright.WaitForSelectorStateVisible,
+			Timeout: playwright.Float(5000),
+		}); err != nil {
+			return fmt.Errorf("result cards not visible on page %d for %s search", pageNumber, searchAttribute)
+		}
+
+		filename := fmt.Sprintf("%s-page-%d.png", searchAttribute, pageNumber)
+		if err := bt.Browser.Screenshot(filename); err != nil {
+			logrus.Warnf("Failed to take debug screenshot: %v", err)
+		}
+
+		allCards := page.Locator(".pf-v5-c-card")
+		cardCount, err := allCards.Count()
+		if err != nil {
+			return fmt.Errorf("failed to get result card count on page %d: %w", pageNumber, err)
+		}
+
+		// Check all visible cards for the target UUID
+		for i := 0; i < cardCount; i++ {
+			uuidText, _ := allCards.Nth(i).Locator("h2 a").TextContent()
+			if uuidText == targetUUID {
+				logrus.Infof("Search successful: Found entry with UUID %s on page %d for %s search", targetUUID, pageNumber, searchAttribute)
+				return nil
+			}
+		}
+
+		paginationNav := page.Locator(".pf-v5-c-pagination__nav")
+		if err := paginationNav.WaitFor(playwright.LocatorWaitForOptions{
+			State:   playwright.WaitForSelectorStateVisible,
+			Timeout: playwright.Float(3000),
+		}); err != nil {
+			return fmt.Errorf("entry with UUID %s not found and no pagination exists for %s search", targetUUID, searchAttribute)
+		}
+
+		nextButton := paginationNav.Locator(`button[data-action="next"]`)
+		isDisabled, err := nextButton.IsDisabled()
+		if err != nil {
+			return fmt.Errorf("failed to check if next button is disabled: %w", err)
+		}
+
+		if isDisabled {
+			// We are on the last page and didn't find the entry
+			return fmt.Errorf("could not find entry with UUID %s after checking all pages for %s search", targetUUID, searchAttribute)
+		}
+
+		firstCardBeforeClick := page.Locator(".pf-v5-c-card").First()
+
+		logrus.Infof("Entry not found on page %d for %s search, clicking next...", pageNumber, searchAttribute)
+		if err := nextButton.Click(); err != nil {
+			return fmt.Errorf("failed to click next page button: %w", err)
+		}
+		pageNumber++
+
+		if err := firstCardBeforeClick.WaitFor(playwright.LocatorWaitForOptions{
+			State:   playwright.WaitForSelectorStateDetached,
+			Timeout: playwright.Float(10000),
+		}); err != nil {
+			return fmt.Errorf("old content did not detach after clicking next: %w", err)
+		}
+	}
+}
+
 func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string) error {
 	browser := bt.Browser
 
@@ -350,77 +387,14 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 			Timeout: playwright.Float(5_000),
 			State:   playwright.WaitForSelectorStateVisible,
 		}); err != nil {
-		logrus.Warnf("No result cards became visible within 5 s – continuing anyway")
+		return fmt.Errorf("no result cards became visible after search: %w", err)
 	}
 
-	allCards := browser.Page.Locator(".pf-v5-c-card")
-	cardCount, _ := allCards.Count()
-
-	foundResult := false
-	for i := 0; i < cardCount; i++ {
-		uuidText, _ := allCards.Nth(i).Locator("h2 a").TextContent()
-		if uuidText == bt.TestData.EntryUUID {
-			foundResult = true
-			break
-		}
-	}
-
-	Expect(browser.Screenshot(fmt.Sprintf("%s-search-results.png", attributeValue))).To(Succeed())
-
-	if foundResult {
-		logrus.Infof("Search successful: Found entry with UUID %s", bt.TestData.EntryUUID)
-		return nil
-	}
-	return fmt.Errorf("could not find a card with UUID %s", bt.TestData.EntryUUID)
+	return bt.findEntryAcrossPages(bt.TestData.EntryUUID, attributeValue)
 }
 
 func (bt *BrowserTest) TestEmailSearch() error {
-	err := bt.performSearch("email", "#rekor-search-email", bt.TestData.Email)
-
-	// Fall back to UUID search if the email search fails
-	if err != nil {
-		logrus.Warnf("Email search failed, possibly due to result limit. Falling back to UUID search.")
-
-		uuidErr := bt.performSearch("uuid", `#rekor-search-entry\ uuid`, bt.TestData.EntryUUID)
-		if uuidErr != nil {
-			return fmt.Errorf("both email and UUID searches failed: email error: %w, UUID error: %w", err, uuidErr)
-		}
-
-		card := bt.Browser.Page.Locator(".pf-v5-c-card").First()
-		cardText, err := card.TextContent()
-		if err != nil {
-			return fmt.Errorf("failed to get card text content:  %w", err)
-		}
-
-		if strings.Contains(cardText, bt.TestData.Email) {
-			logrus.Infof("Email search fallback successful: Found entry with UUID %s and email %s",
-				bt.TestData.EntryUUID, bt.TestData.Email)
-			logrus.Infof("Card text: %s", cardText)
-			return nil
-		}
-
-		entryLink := bt.Browser.Page.Locator(`h2 a[href*="` + bt.TestData.EntryUUID + `"]`)
-		if err := entryLink.Click(); err != nil {
-			return fmt.Errorf("failed to click entry link: %w", err)
-		}
-
-		if err := bt.Browser.Page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{
-			State: playwright.LoadStateNetworkidle,
-		}); err != nil {
-			return fmt.Errorf("failed to wait for entry details to load: %w", err)
-		}
-
-		emailElement := bt.Browser.Page.Locator(`text=` + bt.TestData.Email)
-		if visible, _ := emailElement.IsVisible(); !visible {
-			return fmt.Errorf("entry found by UUID, but email %s not found on details page", bt.TestData.Email)
-		}
-
-		logrus.Infof("Email search fallback successful: Found entry with UUID %s and verified email %s",
-			bt.TestData.EntryUUID, bt.TestData.Email)
-		return nil
-	}
-
-	return nil
+	return bt.performSearch("email", "#rekor-search-email", bt.TestData.Email)
 }
 
 func (bt *BrowserTest) TestHashSearch() error {
@@ -470,8 +444,6 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 			gitsign,
 			cosign,
 		)).To(Succeed())
-
-		Expect(InstallPlaywright()).To(Succeed())
 
 		DeferCleanup(func() {
 			if err := testsupport.DestroyPrerequisites(); err != nil {
