@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,10 +26,11 @@ import (
 type BrowserType string
 
 const (
-	Chrome  BrowserType = "chrome"
-	Firefox BrowserType = "firefox"
-	Safari  BrowserType = "safari"
-	Edge    BrowserType = "edge"
+	Chrome         BrowserType = "chrome"
+	Firefox        BrowserType = "firefox"
+	Safari         BrowserType = "safari"
+	Edge           BrowserType = "edge"
+	MaxSearchPages int         = 20
 )
 
 func GetBrowsersToTest() []BrowserType {
@@ -234,6 +236,31 @@ func (bt *BrowserTest) Close() error {
 	return bt.Browser.Close()
 }
 
+func (bt *BrowserTest) executeFallbackVerification(searchAttribute string) error {
+	logrus.Warn("Initiating fallback: Verifying email by searching for its unique UUID.")
+
+	if err := bt.performSearch("uuid", `#rekor-search-entry\ uuid`, bt.TestData.EntryUUID); err != nil {
+		return fmt.Errorf("fallback failed: could not find entry by UUID: %w", err)
+	}
+
+	card := bt.Browser.Page.Locator(".pf-v5-c-card").First()
+	emailText := fmt.Sprintf("- %s", bt.TestData.Email)
+	emailLocator := card.Locator("text=" + emailText)
+
+	if err := emailLocator.WaitFor(playwright.LocatorWaitForOptions{
+		State:   playwright.WaitForSelectorStateVisible,
+		Timeout: playwright.Float(3000),
+	}); err != nil {
+		Expect(bt.Browser.Screenshot(fmt.Sprintf("%s-fallback-verification-failed.png", searchAttribute))).To(Succeed())
+		return fmt.Errorf("fallback failed: could not find email '%s' on the result card: %w", bt.TestData.Email, err)
+	}
+
+	Expect(bt.Browser.Screenshot(fmt.Sprintf("%s-fallback-verification-successful.png", searchAttribute))).To(Succeed())
+
+	logrus.Infof("Fallback successful: Email '%s' correctly verified on the entry found by UUID.", bt.TestData.Email)
+	return nil
+}
+
 func (bt *BrowserTest) findEntryAcrossPages(targetUUID string, searchAttribute string) error {
 	page := bt.Browser.Page
 	pageNumber := 1
@@ -244,6 +271,22 @@ func (bt *BrowserTest) findEntryAcrossPages(targetUUID string, searchAttribute s
 			Timeout: playwright.Float(5000),
 		}); err != nil {
 			return fmt.Errorf("result cards not visible on page %d for %s search", pageNumber, searchAttribute)
+		}
+
+		if pageNumber == 1 {
+			paginationLocator := page.Locator(".pf-v5-c-pagination__nav-page-select > span[aria-hidden='true']")
+			paginationText, err := paginationLocator.TextContent(playwright.LocatorTextContentOptions{Timeout: playwright.Float(1000)})
+
+			if err == nil {
+				parts := strings.Split(paginationText, " ")
+				if len(parts) == 2 {
+					totalPages, convErr := strconv.Atoi(parts[1])
+					if convErr == nil && totalPages > MaxSearchPages {
+						logrus.Warnf("Total pages (%d) for email search exceeds limit (%d). Triggering fallback.", totalPages, MaxSearchPages)
+						return bt.executeFallbackVerification(searchAttribute)
+					}
+				}
+			}
 		}
 
 		filename := fmt.Sprintf("%s-page-%d.png", searchAttribute, pageNumber)
