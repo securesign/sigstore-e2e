@@ -39,8 +39,6 @@ test:
 
 setup:
 	@echo "Installing Playwright dependencies..."
-	@npm install @playwright/test
-	@npx playwright install --with-deps
 	@go run github.com/playwright-community/playwright-go/cmd/playwright install
 
 

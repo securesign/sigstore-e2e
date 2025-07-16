@@ -33,7 +33,7 @@ const (
 	MaxSearchPages int         = 20
 )
 
-func GetBrowsersToTest() []BrowserType {
+func getBrowsersToTest() []BrowserType {
 	browsersToTest := []BrowserType{Chrome} // Default to Chrome
 
 	if api.GetValueFor(api.TestFirefox) == "true" {
@@ -57,7 +57,7 @@ type Browser struct {
 	BrowserType BrowserType
 }
 
-func CreateBrowser(browserType BrowserType, headless bool) (*Browser, error) {
+func createBrowser(browserType BrowserType, headless bool) (*Browser, error) {
 	pw, err := playwright.Run()
 	if err != nil {
 		return nil, fmt.Errorf("could not start playwright: %w", err)
@@ -218,8 +218,8 @@ type BrowserTest struct {
 	BrowserType BrowserType
 }
 
-func NewBrowserTest(browserType BrowserType, headless bool, url string, testData *TestData) (*BrowserTest, error) {
-	browser, err := CreateBrowser(browserType, headless)
+func newBrowserTest(browserType BrowserType, headless bool, url string, testData *TestData) (*BrowserTest, error) {
+	browser, err := createBrowser(browserType, headless)
 	if err != nil {
 		return nil, err
 	}
@@ -495,7 +495,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 		})
 
 		// Create screenshots directory for each browser type
-		for _, browserType := range GetBrowsersToTest() {
+		for _, browserType := range getBrowsersToTest() {
 			screenshotDir := filepath.Join("screenshots", browserType.String())
 			if _, err := os.Stat(screenshotDir); os.IsNotExist(err) {
 				Expect(os.MkdirAll(screenshotDir, 0755)).To(Succeed())
@@ -606,11 +606,11 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 		logrus.Infof("Log Index = %s\n", testData.LogIndex)
 
 		logrus.Infof("UI URL: %s", appURL)
-		logrus.Infof("Testing with browsers: %v\n", GetBrowsersToTest())
+		logrus.Infof("Testing with browsers: %v\n", getBrowsersToTest())
 	})
 
 	// Run tests for each browser type
-	for _, browserType := range GetBrowsersToTest() {
+	for _, browserType := range getBrowsersToTest() {
 		// Use a closure to capture the browser type for each iteration
 		func(bt BrowserType) {
 			Context(fmt.Sprintf("Testing with %s browser", bt), func() {
@@ -621,7 +621,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 
 					headless := api.GetValueFor(api.HeadlessUI) == "true"
 					var err error
-					browserTest, err = NewBrowserTest(bt, headless, appURL, &testData)
+					browserTest, err = newBrowserTest(bt, headless, appURL, &testData)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
