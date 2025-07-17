@@ -25,6 +25,9 @@ const (
 	RegistryImage    = "REGISTRY_IMAGE"
 	TsaURL           = "TSA_URL"
 	HeadlessUI       = "HEADLESS_UI"
+	TestFirefox      = "TEST_FIREFOX"
+	TestSafari       = "TEST_SAFARI"
+	TestEdge         = "TEST_EDGE"
 
 	// 'DockerRegistry*' - Login credentials for 'registry.redhat.io'.
 	DockerRegistryUsername = "REGISTRY_USERNAME"
@@ -47,6 +50,9 @@ func init() {
 	Values.SetDefault(HeadlessUI, "true")
 	Values.SetDefault(ManualImageSetup, "false")
 	Values.SetDefault(CosignImage, "registry.redhat.io/rhtas/cosign-rhel9:1.0.2")
+	Values.SetDefault(TestFirefox, "true")
+	Values.SetDefault(TestSafari, "true")
+	Values.SetDefault(TestEdge, "true")
 	Values.SetDefault(RegistryImage, "registry:2.8.3")
 	Values.AutomaticEnv()
 }
