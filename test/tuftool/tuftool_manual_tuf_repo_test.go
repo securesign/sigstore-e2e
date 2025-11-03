@@ -218,6 +218,7 @@ func verifyWorkdirStructure(rootPath string) {
 		".fulcio_v1.crt.pem",
 		".ctfe.pub",
 		".rekor.pub",
+		".signing_config.v0.2.json",
 	}
 
 	foundSuffixesCount := make(map[string]int)
