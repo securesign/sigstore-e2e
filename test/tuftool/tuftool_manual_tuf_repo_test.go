@@ -218,6 +218,7 @@ func verifyWorkdirStructure(rootPath string) {
 		".fulcio_v1.crt.pem",
 		".ctfe.pub",
 		".rekor.pub",
+		".signing_config.v0.2.json",
 	}
 
 	foundSuffixesCount := make(map[string]int)
@@ -280,9 +281,9 @@ func verifyWorkdirStructure(rootPath string) {
 	}
 
 	for suffix, count := range foundSuffixesCount {
-		if suffix == ".trusted_root.json" {
-			// Allow multiple .trusted_root.json files
-			Expect(count).To(BeNumerically(">=", 1), fmt.Sprintf("Expected at least one .trusted_root.json file, found %d", count))
+		if suffix == ".trusted_root.json" || suffix == ".signing_config.v0.2.json" {
+			// Allow multiple .trusted_root.json and .signing_config.v0.2.json files
+			Expect(count).To(BeNumerically(">=", 1), fmt.Sprintf("Expected at least one file with suffix %s, found %d", suffix, count))
 		} else {
 			// Ensure only one file for other suffixes
 			Expect(count).To(Equal(1), fmt.Sprintf("Expected exactly one file with suffix %s, found %d", suffix, count))
