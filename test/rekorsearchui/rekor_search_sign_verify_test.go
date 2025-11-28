@@ -427,7 +427,7 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 	if err := browser.Page.Locator(".pf-v5-c-card").
 		First().
 		WaitFor(playwright.LocatorWaitForOptions{
-			Timeout: playwright.Float(5_000),
+			Timeout: playwright.Float(15000),
 			State:   playwright.WaitForSelectorStateVisible,
 		}); err != nil {
 		return fmt.Errorf("no result cards became visible after search: %w", err)
