@@ -110,7 +110,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 	Describe("cosign verify", func() {
 		It("should verify the signature and extract logIndex", func() {
-			output, err := cosign.CommandOutput(testsupport.TestContext, "verify", "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), targetImageName)
+			output, err := cosign.CommandOutput(testsupport.TestContext, "verify", "--trusted-root", api.GetValueFor(api.CosignTrustedRoot), "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), targetImageName)
 			Expect(err).ToNot(HaveOccurred())
 
 			startIndex := strings.Index(string(output), "[")
