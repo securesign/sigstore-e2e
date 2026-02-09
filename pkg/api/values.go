@@ -3,8 +3,8 @@ package api
 import "github.com/spf13/viper"
 
 const (
-	FulcioURL        = "SIGSTORE_FULCIO_URL"
-	RekorURL         = "SIGSTORE_REKOR_URL"
+	FulcioURL        = "FULCIO_URL"
+	RekorURL         = "REKOR_URL"
 	RekorUIURL       = "SIGSTORE_REKOR_UI_URL"
 	TufURL           = "TUF_URL"
 	OidcIssuerURL    = "SIGSTORE_OIDC_ISSUER"
