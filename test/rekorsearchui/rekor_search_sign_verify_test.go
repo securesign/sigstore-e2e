@@ -502,7 +502,7 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 	appURL := api.GetValueFor(api.RekorUIURL)
 
 	BeforeAll(func() {
-		err := testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm, api.RekorUIURL)
+		err := testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm, api.RekorUIURL, api.OidcIssuerURL, api.FulcioURL, api.RekorURL)
 		if err != nil {
 			Fail(err.Error())
 		}
@@ -591,7 +591,10 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(exec.Command("tar", "-czvf", tarFilePath, dirFilePath).Run()).To(Succeed())
-		Expect(cosign.Command(testsupport.TestContext, "initialize").Run()).To(Succeed())
+		tufURL := api.GetValueFor(api.TufURL)
+		Expect(gitsign.Command(testsupport.TestContext, "initialize",
+			"--mirror", tufURL,
+			"--root", tufURL+"/root.json").Run()).To(Succeed())
 
 		cmd := gitsign.Command(testsupport.TestContext, "verify",
 			"--certificate-identity", fmt.Sprintf("%s@%s", api.GetValueFor(api.OidcUser), api.GetValueFor(api.OidcUserDomain)),

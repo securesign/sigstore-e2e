@@ -3,9 +3,7 @@ package cosign
 import (
 	"encoding/base64"
 	"io"
-	"net/http"
 	"os"
-	"path/filepath"
 	"regexp"
 
 	"github.com/docker/docker/api/types/image"
@@ -24,7 +22,6 @@ import (
 const tsaTestImage string = "mirror.gcr.io/alpine:latest"
 
 var tsaTargetImageName string
-var tsaChainPath string
 
 var _ = Describe("TSA test", Ordered, func() {
 
@@ -50,9 +47,6 @@ var _ = Describe("TSA test", Ordered, func() {
 				logrus.Warn("Env was not cleaned-up" + err.Error())
 			}
 		})
-
-		tempDir, err = os.MkdirTemp("", "tmp")
-		Expect(err).ToNot(HaveOccurred())
 
 		manualImageSetup := api.GetValueFor(api.ManualImageSetup) == "true"
 		if !manualImageSetup {
@@ -90,32 +84,13 @@ var _ = Describe("TSA test", Ordered, func() {
 		It("should sign the container using TSA", func() {
 			token, err := testsupport.GetOIDCToken(testsupport.TestContext)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(cosign.Command(testsupport.TestContext, "sign", "-y", "--timestamp-server-url", api.GetValueFor(api.TsaURL), "--identity-token="+token, tsaTargetImageName).Run()).To(Succeed())
-		})
-	})
-
-	Describe("download tsa chain", func() {
-		It("should download the tsa chain", func() {
-			tsaChainPath = filepath.Join(tempDir, "ts_chain.pem")
-
-			resp, err := http.Get(api.GetValueFor(api.TsaURL) + "/certchain")
-			Expect(err).ToNot(HaveOccurred())
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusOK {
-				logrus.Fatal("failed to download TSA chain")
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			Expect(err).ToNot(HaveOccurred())
-
-			Expect(os.WriteFile(tsaChainPath, body, 0600)).To(Succeed())
+			Expect(cosign.Command(testsupport.TestContext, "sign", "--identity-token="+token, tsaTargetImageName).Run()).To(Succeed())
 		})
 	})
 
 	Describe("cosign verify tsa", func() {
 		It("should verify the signature using TSA", func() {
-			Expect(cosign.Command(testsupport.TestContext, "verify", "--timestamp-certificate-chain", tsaChainPath, "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), tsaTargetImageName).Run()).To(Succeed())
+			Expect(cosign.Command(testsupport.TestContext, "verify", "--use-signed-timestamps", "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), tsaTargetImageName).Run()).To(Succeed())
 		})
 	})
 })

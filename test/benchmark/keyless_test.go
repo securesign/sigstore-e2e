@@ -94,10 +94,8 @@ func BenchmarkKeyless(b *testing.B) {
 			Env: map[string]string{
 				"COSIGN_MIRROR":         api.GetValueFor(api.TufURL),
 				"COSIGN_ROOT":           api.GetValueFor(api.TufURL) + "/root.json",
-				"COSIGN_REKOR_URL":      api.GetValueFor(api.RekorURL),
-				"COSIGN_FULCIO_URL":     api.GetValueFor(api.FulcioURL),
-				"COSIGN_OIDC_ISSUER":    api.GetValueFor(api.OidcIssuerURL),
 				"COSIGN_OIDC_CLIENT_ID": api.GetValueFor(api.OidcRealm),
+				"COSIGN_YES":            "true",
 			},
 		}
 
@@ -157,7 +155,7 @@ func keylessProcess(ctx context.Context, images *sync.Pool, containers *Containe
 
 	logrus.Info("sign: ", image)
 	token := tm.GetToken()
-	err := containers.ExecuteCommandInContainer(ctx, "cosign", "sign", "--allow-http-registry=true", "--upload=false", "-y", "--identity-token="+token, image)
+	err := containers.ExecuteCommandInContainer(ctx, "cosign", "sign", "--allow-http-registry=true", "--upload=false", "--identity-token="+token, image)
 	if err != nil {
 		return err
 	}

@@ -29,6 +29,20 @@ type RekorCLIGetOutput struct {
 			} `json:"publicKey"`
 		} `json:"signature"`
 	} `json:"RekordObj"`
+	DSSEObj struct {
+		EnvelopeHash struct {
+			Algorithm string `json:"algorithm"`
+			Value     string `json:"value"`
+		} `json:"envelopeHash"`
+		PayloadHash struct {
+			Algorithm string `json:"algorithm"`
+			Value     string `json:"value"`
+		} `json:"payloadHash"`
+		Signatures []struct {
+			Signature string `json:"signature"`
+			Verifier  string `json:"verifier"`
+		} `json:"signatures"`
+	} `json:"DSSEObj"`
 }
 
 type CosignVerifyOutput []struct {
