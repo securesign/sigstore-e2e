@@ -34,7 +34,7 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 	)
 
 	BeforeAll(func() {
-		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm)
+		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm, api.RekorURL)
 		if err != nil {
 			Fail(err.Error())
 		}

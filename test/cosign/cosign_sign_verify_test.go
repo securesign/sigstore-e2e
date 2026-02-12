@@ -27,6 +27,8 @@ const testImage string = "mirror.gcr.io/alpine:latest"
 
 var logIndex int
 var hashValue string
+var rekorEntryType string
+var dsseEnvelopePath string
 var tempDir string
 var publicKeyPath string
 var signaturePath string
@@ -95,7 +97,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 	})
 
 	Describe("Cosign initialize", func() {
-		It("should initialize the cosign root", func() {
+		It("should initialize the TUF root", func() {
 			Expect(cosign.Command(testsupport.TestContext, "initialize").Run()).To(Succeed())
 		})
 	})
@@ -104,25 +106,46 @@ var _ = Describe("Cosign test", Ordered, func() {
 		It("should sign the container", func() {
 			token, err := testsupport.GetOIDCToken(testsupport.TestContext)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(cosign.Command(testsupport.TestContext, "sign", "-y", "--identity-token="+token, targetImageName).Run()).To(Succeed())
+
+			Expect(cosign.Command(testsupport.TestContext, "sign", "--identity-token="+token, targetImageName).Run()).To(Succeed())
+
+			// Extract logIndex by downloading the signature bundle from the registry
+			bundleOutput, err := cosign.CommandOutput(testsupport.TestContext, "download", "signature", targetImageName)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Find JSON start in case there are any log messages before the bundle
+			startIdx := strings.Index(string(bundleOutput), "{")
+			Expect(startIdx).NotTo(Equal(-1), "JSON start - '{' not found in bundle output")
+			bundleJSON := bundleOutput[startIdx:]
+
+			var bundle struct {
+				VerificationMaterial struct {
+					TlogEntries []struct {
+						LogIndex json.RawMessage `json:"logIndex"`
+					} `json:"tlogEntries"`
+				} `json:"verificationMaterial"`
+				DSSEEnvelope json.RawMessage `json:"dsseEnvelope"`
+			}
+			err = json.Unmarshal(bundleJSON, &bundle)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(bundle.VerificationMaterial.TlogEntries).NotTo(BeEmpty())
+
+			logIndexStr := strings.Trim(string(bundle.VerificationMaterial.TlogEntries[0].LogIndex), "\"")
+			logIndex, err = strconv.Atoi(logIndexStr)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Save DSSE envelope if present (needed for rekor-cli verify with DSSE entries)
+			if len(bundle.DSSEEnvelope) > 0 {
+				dsseEnvelopePath = filepath.Join(tempDir, "dsse-envelope.json")
+				Expect(os.WriteFile(dsseEnvelopePath, bundle.DSSEEnvelope, 0600)).To(Succeed())
+			}
 		})
 	})
 
 	Describe("cosign verify", func() {
-		It("should verify the signature and extract logIndex", func() {
-			output, err := cosign.CommandOutput(testsupport.TestContext, "verify", "--trusted-root", api.GetValueFor(api.CosignTrustedRoot), "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), targetImageName)
+		It("should verify the signature", func() {
+			_, err := cosign.CommandOutput(testsupport.TestContext, "verify", "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), targetImageName)
 			Expect(err).ToNot(HaveOccurred())
-
-			startIndex := strings.Index(string(output), "[")
-			Expect(startIndex).NotTo(Equal(-1), "JSON start - '[' not found")
-
-			jsonStr := string(output[startIndex:])
-
-			var cosignVerifyOutput testsupport.CosignVerifyOutput
-			err = json.Unmarshal([]byte(jsonStr), &cosignVerifyOutput)
-			Expect(err).ToNot(HaveOccurred())
-
-			logIndex = cosignVerifyOutput[0].Optional.Bundle.Payload.LogIndex
 		})
 	})
 
@@ -144,10 +167,26 @@ var _ = Describe("Cosign test", Ordered, func() {
 			err = json.Unmarshal([]byte(jsonStr), &rekorGetOutput)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Extract values from rekor-cli get output
-			signatureContent := rekorGetOutput.HashedRekordObj.Signature.Content
-			publicKeyContent := rekorGetOutput.HashedRekordObj.Signature.PublicKey.Content
-			hashValue = rekorGetOutput.HashedRekordObj.Data.Hash.Value
+			// Extract values from rekor-cli get output - handle both HashedRekordObj and DSSEObj
+			var signatureContent, publicKeyContent string
+			if len(rekorGetOutput.DSSEObj.Signatures) > 0 {
+				rekorEntryType = "dsse:0.0.1"
+				signatureContent = rekorGetOutput.DSSEObj.Signatures[0].Signature
+				publicKeyContent = rekorGetOutput.DSSEObj.Signatures[0].Verifier
+				hashValue = rekorGetOutput.DSSEObj.PayloadHash.Value
+			} else if rekorGetOutput.HashedRekordObj.Signature.Content != "" {
+				rekorEntryType = "hashedrekord:0.0.1"
+				signatureContent = rekorGetOutput.HashedRekordObj.Signature.Content
+				publicKeyContent = rekorGetOutput.HashedRekordObj.Signature.PublicKey.Content
+				hashValue = rekorGetOutput.HashedRekordObj.Data.Hash.Value
+			} else if rekorGetOutput.RekordObj.Signature.Content != "" {
+				rekorEntryType = "rekord:0.0.1"
+				signatureContent = rekorGetOutput.RekordObj.Signature.Content
+				publicKeyContent = rekorGetOutput.RekordObj.Signature.PublicKey.Content
+				hashValue = rekorGetOutput.RekordObj.Data.Hash.Value
+			} else {
+				Fail("Unrecognized Rekor entry type in rekor-cli get output")
+			}
 
 			// Decode signatureContent and publicKeyContent from base64
 			decodedSignatureContent, err := base64.StdEncoding.DecodeString(signatureContent)
@@ -169,7 +208,12 @@ var _ = Describe("Cosign test", Ordered, func() {
 		It("should verify the artifact using rekor-cli", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 
-			Expect(rekorCli.Command(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", signaturePath, "--public-key", publicKeyPath, "--pki-format", "x509", "--type", "hashedrekord:0.0.1", "--artifact-hash", hashValue).Run()).To(Succeed())
+			if rekorEntryType == "dsse:0.0.1" {
+				// DSSE entries require the full envelope as --artifact
+				Expect(rekorCli.Command(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--artifact", dsseEnvelopePath, "--public-key", publicKeyPath, "--pki-format", "x509", "--type", rekorEntryType).Run()).To(Succeed())
+			} else {
+				Expect(rekorCli.Command(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", signaturePath, "--public-key", publicKeyPath, "--pki-format", "x509", "--type", rekorEntryType, "--artifact-hash", hashValue).Run()).To(Succeed())
+			}
 		})
 	})
 
@@ -202,7 +246,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 			token, err := testsupport.GetOIDCToken(testsupport.TestContext)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(cosign.Command(testsupport.TestContext, "attest", "-y", "--identity-token="+token, "--fulcio-url="+api.GetValueFor(api.FulcioURL), "--rekor-url="+api.GetValueFor(api.RekorURL), "--oidc-issuer="+api.GetValueFor(api.OidcIssuerURL), "--predicate", predicatePath, "--type", "slsaprovenance", targetImageName).Run()).To(Succeed())
+			Expect(cosign.Command(testsupport.TestContext, "attest", "--identity-token="+token, "--predicate", predicatePath, "--type", "slsaprovenance", targetImageName).Run()).To(Succeed())
 		})
 	})
 
@@ -215,35 +259,65 @@ var _ = Describe("Cosign test", Ordered, func() {
 			hashPattern := regexp.MustCompile(`└── 🍒 \w+:[0-9a-f]{64}`)
 
 			lines := strings.Split(string(output), "\n")
-			inSignatureSection := false
-			inAttestationSection := false
-			hasSignature := false
-			hasAttestation := false
 
+			usesOCIReferrers := false
 			for _, line := range lines {
-				if strings.Contains(line, "Signatures for an image tag:") {
-					inSignatureSection = true
-					inAttestationSection = false
-					continue
-				} else if strings.Contains(line, "Attestations for an image tag:") {
-					inSignatureSection = false
-					inAttestationSection = true
-					continue
-				}
-
-				if inSignatureSection && hashPattern.MatchString(line) {
-					hasSignature = true
-				} else if inAttestationSection && hashPattern.MatchString(line) {
-					hasAttestation = true
+				if strings.Contains(line, "OCI referrer") || strings.Contains(line, "via OCI") {
+					usesOCIReferrers = true
+					break
 				}
 			}
 
-			Expect(hasAttestation).To(BeTrue(), "Expected the image to have at least one attestation")
-			Expect(hasSignature).To(BeTrue(), "Expected the image to have at least one signature")
+			if usesOCIReferrers {
+				artifactCount := 0
+				for _, line := range lines {
+					if hashPattern.MatchString(line) {
+						artifactCount++
+					}
+				}
+				Expect(artifactCount).To(BeNumerically(">=", 2),
+					"Expected at least 2 artifacts (signature + attestation) in cosign tree output")
+			} else {
+				inSignatureSection := false
+				inAttestationSection := false
+				hasSignature := false
+				hasAttestation := false
+
+				for _, line := range lines {
+					if strings.Contains(line, "Signatures for an image tag:") {
+						inSignatureSection = true
+						inAttestationSection = false
+						continue
+					} else if strings.Contains(line, "Attestations for an image tag:") {
+						inSignatureSection = false
+						inAttestationSection = true
+						continue
+					}
+
+					if inSignatureSection && hashPattern.MatchString(line) {
+						hasSignature = true
+					} else if inAttestationSection && hashPattern.MatchString(line) {
+						hasAttestation = true
+					}
+				}
+
+				Expect(hasAttestation).To(BeTrue(), "Expected the image to have at least one attestation")
+				Expect(hasSignature).To(BeTrue(), "Expected the image to have at least one signature")
+			}
 		})
 	})
 
 	Describe("ec validate", func() {
+		// ec uses sigstore/sigstore (old TUF format: remote.json + tuf.db).
+		// cosign v3 initialize overwrites the cache with the sigstore-go format,
+		// so we must re-initialize ec's TUF root right before ec validate runs.
+		It("should initialize ec TUF root", func() {
+			tufURL := api.GetValueFor(api.TufURL)
+			Expect(ec.Command(testsupport.TestContext, "sigstore", "initialize",
+				"--mirror", tufURL,
+				"--root", tufURL+"/root.json").Run()).To(Succeed())
+		})
+
 		It("should verify signature and attestation of the image", func() {
 			output, err := ec.CommandOutput(testsupport.TestContext, "validate", "image", "--image", targetImageName, "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), "--output", "yaml", "--show-successes")
 			Expect(err).ToNot(HaveOccurred())
