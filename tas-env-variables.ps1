@@ -1,7 +1,7 @@
 # Get the URLs and export them as environment variables
 $TUF_URL = $(oc get tuf -o jsonpath='{.items[0].status.url}')
 $OIDC_ROUTE = $(oc get route keycloak -n keycloak-system --template='{{.spec.host}}')
-$OIDC_ISSUER_URL = "https://$OIDC_ROUTE/auth/realms/trusted-artifact-signer"
+$OIDC_ISSUER_URL = "https://$OIDC_ROUTE/realms/trusted-artifact-signer"
 $COSIGN_FULCIO_URL = $(oc get fulcio -o jsonpath='{.items[0].status.url}')
 $COSIGN_REKOR_URL = $(oc get rekor -o jsonpath='{.items[0].status.url}')
 $TSA = $(oc get timestampauthorities -o jsonpath='{.items[0].status.url}')

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ -z "$OIDC_ISSUER_URL" ]; then
-  export OIDC_ISSUER_URL=https://$(oc get route keycloak -n keycloak-system | tail -n 1 | awk '{print $2}')/auth/realms/trusted-artifact-signer
+  export OIDC_ISSUER_URL=https://$(oc get route keycloak -n keycloak-system | tail -n 1 | awk '{print $2}')/realms/trusted-artifact-signer
 fi
 
 if [ -z "$TUF_URL" ]; then
