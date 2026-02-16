@@ -2,7 +2,7 @@
 
 REM Get the URLs and export them as environment variables
 for /f "tokens=*" %%i in ('oc get tuf -o jsonpath^="{.items[0].status.url}"') do set TUF_URL=%%i
-for /f "tokens=*" %%i in ('oc get route keycloak -n keycloak-system --template^="{{.spec.host}}"') do set OIDC_ROUTE=%%i
+for /f "tokens=*" %%i in ('oc get route -n keycloak-system -l app^=keycloak -o jsonpath^="{.items[0].spec.host}"') do set OIDC_ROUTE=%%i
 set OIDC_ISSUER_URL=https://%OIDC_ROUTE%/realms/trusted-artifact-signer
 for /f "tokens=*" %%i in ('oc get fulcio -o jsonpath^="{.items[0].status.url}"') do set COSIGN_FULCIO_URL=%%i
 for /f "tokens=*" %%i in ('oc get rekor -o jsonpath^="{.items[0].status.url}"') do set COSIGN_REKOR_URL=%%i
