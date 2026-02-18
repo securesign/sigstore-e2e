@@ -27,13 +27,13 @@ import (
 
 var logIndex string
 var hashValue string
+var rekorEntryType string
 var tempDir string
 var publicKeyPath string
 var signaturePath string
 
 var _ = Describe("Signing and verifying commits by using Gitsign from the command-line interface", Ordered, func() {
 	var gitsign = clients.NewGitsign()
-	var cosign = clients.NewCosign()
 	var rekorCli = clients.NewRekorCli()
 
 	var (
@@ -43,14 +43,13 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		err    error
 	)
 	BeforeAll(func() {
-		err = testsupport.CheckAnyTestMandatoryAPIConfigValues()
+		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcIssuerURL, api.FulcioURL, api.RekorURL)
 		if err != nil {
 			Fail(err.Error())
 		}
 
 		Expect(testsupport.InstallPrerequisites(
 			gitsign,
-			cosign,
 			rekorCli,
 		)).To(Succeed())
 
@@ -125,9 +124,12 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 	})
 
 	Describe("Verify the commit", func() {
-		Context("With initialized Fulcio CA", func() {
-			It("initialize cosign", func() {
-				Expect(cosign.Command(testsupport.TestContext, "initialize").Run()).To(Succeed())
+		Context("With initialized TUF root", func() {
+			It("initialize gitsign TUF root", func() {
+				tufURL := api.GetValueFor(api.TufURL)
+				Expect(gitsign.Command(testsupport.TestContext, "initialize",
+					"--mirror", tufURL,
+					"--root", tufURL+"/root.json").Run()).To(Succeed())
 			})
 		})
 
@@ -174,10 +176,26 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 			err = json.Unmarshal([]byte(jsonStr), &rekorGetOutput)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Extract values from rekor-cli get output
-			signatureContent := rekorGetOutput.HashedRekordObj.Signature.Content
-			publicKeyContent := rekorGetOutput.HashedRekordObj.Signature.PublicKey.Content
-			hashValue = rekorGetOutput.HashedRekordObj.Data.Hash.Value
+			// Extract values from rekor-cli get output - handle both HashedRekordObj and DSSEObj
+			var signatureContent, publicKeyContent string
+			if len(rekorGetOutput.DSSEObj.Signatures) > 0 {
+				rekorEntryType = "dsse:0.0.1"
+				signatureContent = rekorGetOutput.DSSEObj.Signatures[0].Signature
+				publicKeyContent = rekorGetOutput.DSSEObj.Signatures[0].Verifier
+				hashValue = rekorGetOutput.DSSEObj.PayloadHash.Value
+			} else if rekorGetOutput.HashedRekordObj.Signature.Content != "" {
+				rekorEntryType = "hashedrekord:0.0.1"
+				signatureContent = rekorGetOutput.HashedRekordObj.Signature.Content
+				publicKeyContent = rekorGetOutput.HashedRekordObj.Signature.PublicKey.Content
+				hashValue = rekorGetOutput.HashedRekordObj.Data.Hash.Value
+			} else if rekorGetOutput.RekordObj.Signature.Content != "" {
+				rekorEntryType = "rekord:0.0.1"
+				signatureContent = rekorGetOutput.RekordObj.Signature.Content
+				publicKeyContent = rekorGetOutput.RekordObj.Signature.PublicKey.Content
+				hashValue = rekorGetOutput.RekordObj.Data.Hash.Value
+			} else {
+				Fail("Unrecognized Rekor entry type in rekor-cli get output")
+			}
 
 			// Decode signatureContent and publicKeyContent from base64
 			decodedSignatureContent, err := base64.StdEncoding.DecodeString(signatureContent)
@@ -199,7 +217,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 	Describe("Rekor CLI Verify Artifact", func() {
 		It("should verify the artifact using rekor-cli", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
-			Expect(rekorCli.Command(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", signaturePath, "--public-key", publicKeyPath, "--pki-format", "x509", "--type", "hashedrekord:0.0.1", "--artifact-hash", hashValue).Run()).To(Succeed())
+			Expect(rekorCli.Command(testsupport.TestContext, "verify", "--rekor_server", rekorServerURL, "--signature", signaturePath, "--public-key", publicKeyPath, "--pki-format", "x509", "--type", rekorEntryType, "--artifact-hash", hashValue).Run()).To(Succeed())
 		})
 	})
 })

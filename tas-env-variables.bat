@@ -4,49 +4,37 @@ REM Get the URLs and export them as environment variables
 for /f "tokens=*" %%i in ('oc get tuf -o jsonpath^="{.items[0].status.url}"') do set TUF_URL=%%i
 for /f "tokens=*" %%i in ('oc get route -n keycloak-system -l app^=keycloak -o jsonpath^="{.items[0].spec.host}"') do set OIDC_ROUTE=%%i
 set OIDC_ISSUER_URL=https://%OIDC_ROUTE%/realms/trusted-artifact-signer
-for /f "tokens=*" %%i in ('oc get fulcio -o jsonpath^="{.items[0].status.url}"') do set COSIGN_FULCIO_URL=%%i
-for /f "tokens=*" %%i in ('oc get rekor -o jsonpath^="{.items[0].status.url}"') do set COSIGN_REKOR_URL=%%i
-for /f "tokens=*" %%i in ('oc get timestampauthorities -o jsonpath^="{.items[0].status.url}"') do set TSA=%%i
-set TSA_URL=%TSA%/api/v1/timestamp
+for /f "tokens=*" %%i in ('oc get fulcio -o jsonpath^="{.items[0].status.url}"') do set FULCIO_URL=%%i
+for /f "tokens=*" %%i in ('oc get rekor -o jsonpath^="{.items[0].status.url}"') do set REKOR_URL=%%i
 for /f "tokens=*" %%i in ('oc get rekor -o jsonpath^="{.items[0].status.rekorSearchUIUrl}"') do set REKOR_UI_URL=%%i
 
-REM Print the URLs
-echo TUF_URL: %TUF_URL%
-echo OIDC_ISSUER_URL: %OIDC_ISSUER_URL%
-echo COSIGN_FULCIO_URL: %COSIGN_FULCIO_URL%
-echo COSIGN_REKOR_URL: %COSIGN_REKOR_URL%
-echo TSA_URL: %TSA_URL%
+if "%OIDC_CLIENT_ID%"=="" set OIDC_CLIENT_ID=trusted-artifact-signer
 
 REM Export the environment variables for the current session
+set REKOR_REKOR_SERVER=%REKOR_URL%
+set SIGSTORE_REKOR_UI_URL=%REKOR_UI_URL%
 set COSIGN_MIRROR=%TUF_URL%
 set COSIGN_ROOT=%TUF_URL%/root.json
-set COSIGN_OIDC_CLIENT_ID=trusted-artifact-signer
-set COSIGN_OIDC_ISSUER=%OIDC_ISSUER_URL%
-set COSIGN_CERTIFICATE_OIDC_ISSUER=%OIDC_ISSUER_URL%
-set COSIGN_YES=true
-set SIGSTORE_FULCIO_URL=%COSIGN_FULCIO_URL%
+set COSIGN_OIDC_CLIENT_ID=%OIDC_CLIENT_ID%
 set SIGSTORE_OIDC_ISSUER=%OIDC_ISSUER_URL%
-set SIGSTORE_REKOR_URL=%COSIGN_REKOR_URL%
-set REKOR_REKOR_SERVER=%COSIGN_REKOR_URL%
-set SIGSTORE_OIDC_CLIENT_ID=trusted-artifact-signer
-set TSA_URL=%TSA_URL%
-set SIGSTORE_REKOR_UI_URL=%REKOR_UI_URL%
+set SIGSTORE_OIDC_CLIENT_ID=%OIDC_CLIENT_ID%
+set COSIGN_YES=true
+set GITSIGN_FULCIO_URL=%FULCIO_URL%
+set GITSIGN_REKOR_URL=%REKOR_URL%
 
 REM Print the environment variables to verify they are set
-echo TUF_URL: %TUF_URL%
-echo OIDC_ISSUER_URL: %OIDC_ISSUER_URL%
-echo COSIGN_FULCIO_URL: %COSIGN_FULCIO_URL%
-echo COSIGN_REKOR_URL: %COSIGN_REKOR_URL%
-echo COSIGN_MIRROR: %COSIGN_MIRROR%
-echo COSIGN_ROOT: %COSIGN_ROOT%
-echo COSIGN_OIDC_CLIENT_ID: %COSIGN_OIDC_CLIENT_ID%
-echo COSIGN_OIDC_ISSUER: %COSIGN_OIDC_ISSUER%
-echo COSIGN_CERTIFICATE_OIDC_ISSUER: %COSIGN_CERTIFICATE_OIDC_ISSUER%
-echo COSIGN_YES: %COSIGN_YES%
-echo SIGSTORE_FULCIO_URL: %SIGSTORE_FULCIO_URL%
-echo SIGSTORE_OIDC_ISSUER: %SIGSTORE_OIDC_ISSUER%
-echo SIGSTORE_REKOR_URL: %SIGSTORE_REKOR_URL%
-echo REKOR_REKOR_SERVER: %REKOR_REKOR_SERVER%
-echo SIGSTORE_OIDC_CLIENT_ID: %SIGSTORE_OIDC_CLIENT_ID%
-echo TSA_URL: %TSA_URL%
-echo SIGSTORE_REKOR_UI_URL: %SIGSTORE_REKOR_UI_URL%
+echo TUF_URL=%TUF_URL%
+echo SIGSTORE_REKOR_UI_URL=%SIGSTORE_REKOR_UI_URL%
+echo REKOR_UI_URL=%REKOR_UI_URL%
+echo OIDC_ISSUER_URL=%OIDC_ISSUER_URL%
+echo COSIGN_MIRROR=%COSIGN_MIRROR%
+echo COSIGN_ROOT=%COSIGN_ROOT%
+echo COSIGN_OIDC_CLIENT_ID=%COSIGN_OIDC_CLIENT_ID%
+echo COSIGN_YES=%COSIGN_YES%
+echo SIGSTORE_OIDC_ISSUER=%SIGSTORE_OIDC_ISSUER%
+echo SIGSTORE_OIDC_CLIENT_ID=%SIGSTORE_OIDC_CLIENT_ID%
+echo FULCIO_URL=%FULCIO_URL%
+echo REKOR_URL=%REKOR_URL%
+echo REKOR_REKOR_SERVER=%REKOR_REKOR_SERVER%
+echo GITSIGN_FULCIO_URL=%GITSIGN_FULCIO_URL%
+echo GITSIGN_REKOR_URL=%GITSIGN_REKOR_URL%
