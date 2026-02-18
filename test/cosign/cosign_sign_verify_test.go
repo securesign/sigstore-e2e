@@ -109,16 +109,16 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 			Expect(cosign.Command(testsupport.TestContext, "sign", "--identity-token="+token, targetImageName).Run()).To(Succeed())
 
-			// Extract logIndex by downloading the signature bundle from the registry
+			// Extract logIndex by downloading signature bundles from the registry.
+			// Multiple bundles may exist if the image was signed more than once;
+			// pick the one with the highest logIndex (most recent).
 			bundleOutput, err := cosign.CommandOutput(testsupport.TestContext, "download", "signature", targetImageName)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Find JSON start in case there are any log messages before the bundle
 			startIdx := strings.Index(string(bundleOutput), "{")
 			Expect(startIdx).NotTo(Equal(-1), "JSON start - '{' not found in bundle output")
-			bundleJSON := bundleOutput[startIdx:]
 
-			var bundle struct {
+			type sigBundle struct {
 				VerificationMaterial struct {
 					TlogEntries []struct {
 						LogIndex json.RawMessage `json:"logIndex"`
@@ -126,18 +126,32 @@ var _ = Describe("Cosign test", Ordered, func() {
 				} `json:"verificationMaterial"`
 				DSSEEnvelope json.RawMessage `json:"dsseEnvelope"`
 			}
-			err = json.Unmarshal(bundleJSON, &bundle)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(bundle.VerificationMaterial.TlogEntries).NotTo(BeEmpty())
 
-			logIndexStr := strings.Trim(string(bundle.VerificationMaterial.TlogEntries[0].LogIndex), "\"")
-			logIndex, err = strconv.Atoi(logIndexStr)
-			Expect(err).ToNot(HaveOccurred())
+			decoder := json.NewDecoder(strings.NewReader(string(bundleOutput[startIdx:])))
+			logIndex = -1
+			var bestBundle sigBundle
+			for decoder.More() {
+				var b sigBundle
+				if err := decoder.Decode(&b); err != nil {
+					break
+				}
+				if len(b.VerificationMaterial.TlogEntries) == 0 {
+					continue
+				}
+				idx, err := strconv.Atoi(strings.Trim(string(b.VerificationMaterial.TlogEntries[0].LogIndex), "\""))
+				if err != nil {
+					continue
+				}
+				if idx > logIndex {
+					logIndex = idx
+					bestBundle = b
+				}
+			}
+			Expect(logIndex).To(BeNumerically(">=", 0), "no valid signature bundle found")
 
-			// Save DSSE envelope if present (needed for rekor-cli verify with DSSE entries)
-			if len(bundle.DSSEEnvelope) > 0 {
+			if len(bestBundle.DSSEEnvelope) > 0 {
 				dsseEnvelopePath = filepath.Join(tempDir, "dsse-envelope.json")
-				Expect(os.WriteFile(dsseEnvelopePath, bundle.DSSEEnvelope, 0600)).To(Succeed())
+				Expect(os.WriteFile(dsseEnvelopePath, bestBundle.DSSEEnvelope, 0600)).To(Succeed())
 			}
 		})
 	})
