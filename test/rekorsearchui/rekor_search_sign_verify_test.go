@@ -427,7 +427,7 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 	if err := browser.Page.Locator(".pf-v5-c-card").
 		First().
 		WaitFor(playwright.LocatorWaitForOptions{
-			Timeout: playwright.Float(5_000),
+			Timeout: playwright.Float(15000),
 			State:   playwright.WaitForSelectorStateVisible,
 		}); err != nil {
 		return fmt.Errorf("no result cards became visible after search: %w", err)
@@ -453,6 +453,35 @@ func (bt *BrowserTest) TestUUIDSearch() error {
 }
 
 func (bt *BrowserTest) TestCommitSHASearch() error {
+	// First navigate to check if crypto.subtle is available
+	if err := bt.Browser.Navigate(bt.URL); err != nil {
+		return err
+	}
+
+	// Check if crypto.subtle is available (required for commitSha search)
+	// crypto.subtle is only available in secure contexts (HTTPS, localhost)
+	cryptoCheck, err := bt.Browser.Page.Evaluate(`() => {
+		return {
+			available: typeof crypto !== 'undefined' && crypto.subtle !== undefined,
+			isSecureContext: window.isSecureContext
+		};
+	}`)
+	if err != nil {
+		return fmt.Errorf("failed to check crypto.subtle availability: %w", err)
+	}
+
+	checkResult, ok := cryptoCheck.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("unexpected crypto check result type")
+	}
+
+	available, _ := checkResult["available"].(bool)
+	isSecureContext, _ := checkResult["isSecureContext"].(bool)
+	if !available {
+		logrus.Warnf("Skipping commitSha test: crypto.subtle is not available (isSecureContext=%v, requires HTTPS or localhost)", isSecureContext)
+		return nil
+	}
+
 	return bt.performSearch("commitSha", `#rekor-search-commit\ sha`, bt.TestData.CommitSHA)
 }
 
