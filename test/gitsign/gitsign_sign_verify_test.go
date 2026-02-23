@@ -138,8 +138,6 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 					"HEAD")
 
 				cmd.Dir = dir
-
-				// gitsign requires to find git in PATH
 				cmd.Env = os.Environ()
 
 				var output bytes.Buffer
