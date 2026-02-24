@@ -7,7 +7,7 @@ const (
 	RekorURL         = "REKOR_URL"
 	RekorUIURL       = "SIGSTORE_REKOR_UI_URL"
 	TufURL           = "TUF_URL"
-	OidcIssuerURL    = "SIGSTORE_OIDC_ISSUER"
+	OidcIssuerURL    = "OIDC_ISSUER_URL"
 	OidcToken        = "OIDC_TOKEN"
 	OidcUser         = "OIDC_USER"
 	OidcPassword     = "OIDC_PASSWORD"

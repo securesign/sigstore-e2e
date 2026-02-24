@@ -43,7 +43,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		err    error
 	)
 	BeforeAll(func() {
-		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcIssuerURL, api.FulcioURL, api.RekorURL)
+		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcIssuerURL, api.RekorURL, api.TufURL)
 		if err != nil {
 			Fail(err.Error())
 		}
@@ -72,6 +72,15 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		Expect(err).ToNot(HaveOccurred())
 	})
 
+	Describe("Gitsign initialize", func() {
+		It("should initialize the TUF root", func() {
+			tufURL := api.GetValueFor(api.TufURL)
+			Expect(gitsign.Command(testsupport.TestContext, "initialize",
+				"--mirror", tufURL,
+				"--root", tufURL+"/root.json").Run()).To(Succeed())
+		})
+	})
+
 	Context("With configured git", func() {
 		It("sets the local repository to use OIDC user", func() {
 			config.User.Name = "John Doe"
@@ -80,14 +89,11 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 			Expect(repo.SetConfig(config)).To(Succeed())
 		})
 
-		It("configures the local repository configuration to sign your commits by using the TAS service", func() {
+		It("configures the local repository to sign commits with gitsign", func() {
 			config.Raw.AddOption("commit", "", "gpgsign", "true")
 			config.Raw.AddOption("tag", "", "gpgsign", "true")
 			config.Raw.AddOption("gpg", "x509", "program", "gitsign")
 			config.Raw.AddOption("gpg", "", "format", "x509")
-			config.Raw.AddOption("gitsign", "", "fulcio", api.GetValueFor(api.FulcioURL))
-			config.Raw.AddOption("gitsign", "", "rekor", api.GetValueFor(api.RekorURL))
-			config.Raw.AddOption("gitsign", "", "issuer", api.GetValueFor(api.OidcIssuerURL))
 
 			Expect(repo.SetConfig(config)).To(Succeed())
 		})
@@ -124,15 +130,6 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 	})
 
 	Describe("Verify the commit", func() {
-		Context("With initialized TUF root", func() {
-			It("initialize gitsign TUF root", func() {
-				tufURL := api.GetValueFor(api.TufURL)
-				Expect(gitsign.Command(testsupport.TestContext, "initialize",
-					"--mirror", tufURL,
-					"--root", tufURL+"/root.json").Run()).To(Succeed())
-			})
-		})
-
 		When("commiter is authorized", func() {
 			It("should verify HEAD signature by gitsign", func() {
 				cmd := gitsign.Command(testsupport.TestContext, "verify",
@@ -141,8 +138,6 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 					"HEAD")
 
 				cmd.Dir = dir
-
-				// gitsign requires to find git in PATH
 				cmd.Env = os.Environ()
 
 				var output bytes.Buffer
