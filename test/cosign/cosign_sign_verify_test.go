@@ -321,8 +321,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 		})
 	})
 
-	// TODO: SECURESIGN-3841
-	Describe("ec validate [optional]", Pending, func() {
+	Describe("ec validate", func() {
 		It("should initialize ec TUF root", func() {
 			tufURL := api.GetValueFor(api.TufURL)
 			Expect(ec.Command(testsupport.TestContext, "sigstore", "initialize",
