@@ -74,6 +74,18 @@ func DownloadAndUnzip(ctx context.Context, link string, writer io.Writer) error 
 	return Gunzip(pr, writer)
 }
 
+func DownloadAndUntarArchive(ctx context.Context, link string, dst string) error {
+	pr, pw := io.Pipe()
+
+	go func() {
+		defer pw.Close()
+		if _, err := Download(ctx, link, pw); err != nil {
+			panic(err)
+		}
+	}()
+	return UntarArchive(dst, pr)
+}
+
 func Download(ctx context.Context, link string, writer io.Writer) (int64, error) {
 	client := &http.Client{Timeout: 2 * time.Minute} //nolint:mnd
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)

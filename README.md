@@ -25,11 +25,24 @@ This test suite aims to cover Trusted Artifact Signer deployment with end-to-end
   - Windows PowerShell: `tas-env-variables.ps1`
 
 
-- Optional: Set `CLI_STRATEGY` environment variable to either `openshift` or `local`:
+- Optional: Set `CLI_STRATEGY` environment variable to configure how CLI binaries are obtained:
 ```
 export CLI_STRATEGY=openshift
 ```
-This configures the test suite to download `cosign`, `gitsign`, `rekor-cli`, `ec`, `tuftool` binaries from the cluster's console. If not set, the suite will use local binaries by default.
+  Available strategies:
+  - `local` (default) — uses binaries already on `$PATH`
+  - `openshift` — downloads from the cluster's `ConsoleCLIDownload` resources
+  - `cli_server` — downloads from a CLI server (requires `CLI_SERVER_URL`)
+  - `cgw` — downloads from the Red Hat content gateway (requires `CGW_URL`)
+
+  For the `cgw` strategy, set the base URL including the RHTAS version:
+```
+export CLI_STRATEGY=cgw
+# GA
+export CGW_URL=https://developers.redhat.com/content-gateway/file/cgw/RHTAS/1.4.0
+# Stage
+# export CGW_URL=https://developers.qa.redhat.com/content-gateway/file/cgw/RHTAS/1.4.0
+```
 
 - Optional: To use a manual image setup, set the `MANUAL_IMAGE_SETUP` environment variable to `true` and specify the `TARGET_IMAGE_NAME`.
 ```
