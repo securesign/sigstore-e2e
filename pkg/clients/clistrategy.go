@@ -35,6 +35,12 @@ func PreferredSetupStrategy() SetupStrategy {
 			panic("CLI server URL not specified")
 		}
 		preferredStrategy = DownloadFromCLIServer(server)
+	case "cgw":
+		cgwURL := api.GetValueFor(api.CGWURL)
+		if cgwURL == "" {
+			panic("Content gateway URL (CGW_URL) not specified")
+		}
+		preferredStrategy = DownloadFromContentGateway(cgwURL)
 	case "local":
 		preferredStrategy = LocalBinary()
 	default:
@@ -149,6 +155,57 @@ func DownloadFromCLIServer(serverDomainURL string) SetupStrategy {
 		logrus.Info("Getting binary '", c.Name, "' from CLI server", "Server URL", serverDomainURL)
 		link := fmt.Sprintf("%s/clients/%s/%s-%s.gz", serverDomainURL, runtime.GOOS, c.Name, runtime.GOARCH)
 		return downloadFromLink(ctx, c, link)
+	}
+}
+
+var cgwNameOverride = map[string]string{
+	"gitsign":   "gitsign_cli",
+	"rekor-cli": "rekor_cli",
+}
+
+func contentGatewayName(name string) string {
+	if override, ok := cgwNameOverride[name]; ok {
+		return override
+	}
+	return strings.ReplaceAll(name, "-", "_")
+}
+
+func DownloadFromContentGateway(cgwURL string) SetupStrategy {
+	return func(ctx context.Context, c *cli) (string, error) {
+		cgwName := contentGatewayName(c.Name)
+		archiveName := fmt.Sprintf("%s_%s_%s.tar.gz", cgwName, runtime.GOOS, runtime.GOARCH)
+		link := fmt.Sprintf("%s/%s", strings.TrimRight(cgwURL, "/"), archiveName)
+
+		logrus.Info("Getting binary '", c.Name, "' from content gateway: ", link)
+
+		tmp, err := os.MkdirTemp("", c.Name)
+		if err != nil {
+			return "", err
+		}
+
+		if err = support.DownloadAndUntarArchive(ctx, link, tmp); err != nil {
+			return "", err
+		}
+
+		candidates := []string{
+			c.Name,
+			fmt.Sprintf("%s_%s_%s", cgwName, runtime.GOOS, runtime.GOARCH),
+			fmt.Sprintf("%s-%s-%s", c.Name, runtime.GOOS, runtime.GOARCH),
+		}
+		if runtime.GOOS == "windows" {
+			for i, name := range candidates {
+				candidates[i] = name + ".exe"
+			}
+		}
+
+		for _, name := range candidates {
+			path := filepath.Join(tmp, name)
+			if _, err = os.Stat(path); err == nil {
+				return path, nil
+			}
+		}
+
+		return "", fmt.Errorf("binary for '%s' not found in extracted archive from %s (tried %v)", c.Name, link, candidates)
 	}
 }
 
