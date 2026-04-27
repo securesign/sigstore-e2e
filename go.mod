@@ -1,6 +1,6 @@
 module github.com/securesign/sigstore-e2e
 
-go 1.21
+go 1.24
 
 replace github.com/go-jose/go-jose/v3 => github.com/go-jose/go-jose/v4 v4.0.5
 
@@ -25,6 +25,7 @@ require (
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24 // indirect
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
+	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect

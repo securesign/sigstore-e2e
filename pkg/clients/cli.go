@@ -4,6 +4,8 @@ import (
 	"context"
 	"os/exec"
 
+	"github.com/securesign/sigstore-e2e/pkg/api"
+	"github.com/securesign/sigstore-e2e/pkg/strategy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -14,7 +16,17 @@ type cli struct {
 	versionCommand string
 }
 
-type SetupStrategy func(context.Context, *cli) (string, error)
+type SetupStrategy = strategy.Strategy
+
+func PreferredSetupStrategy() SetupStrategy {
+	name := api.GetValueFor(api.CliStrategy)
+	s, ok := strategy.Get(name)
+	if !ok {
+		logrus.Warnf("Unknown CLI_STRATEGY %q, falling back to local", name)
+		s, _ = strategy.Get("local")
+	}
+	return s
+}
 
 func (c *cli) Command(ctx context.Context, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, c.pathToCLI, args...) // #nosec G204 - we don't expect the code to be running on PROD ENV
@@ -39,14 +51,14 @@ func (c *cli) CommandOutput(ctx context.Context, args ...string) ([]byte, error)
 	return output, err
 }
 
-func (c *cli) WithSetupStrategy(strategy SetupStrategy) *cli {
-	c.setupStrategy = strategy
+func (c *cli) WithSetupStrategy(s SetupStrategy) *cli {
+	c.setupStrategy = s
 	return c
 }
 
 func (c *cli) Setup(ctx context.Context) error {
 	var err error
-	c.pathToCLI, err = c.setupStrategy(ctx, c)
+	c.pathToCLI, err = c.setupStrategy(ctx, c.Name)
 	if err == nil {
 		if c.versionCommand != "" {
 			logrus.Info("Done. Using '", c.pathToCLI, "' with version:")

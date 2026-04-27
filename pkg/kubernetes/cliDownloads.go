@@ -9,12 +9,12 @@ import (
 	controller "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ConsoleCLIDownload(ctx context.Context, cli string, os string, arch string) (string, error) {
+func ConsoleCLIDownload(ctx context.Context, c controller.Reader, cli string, os string, arch string) (string, error) {
 	cld := &consoleV1.ConsoleCLIDownload{}
 	ok := controller.ObjectKey{
 		Name: cli,
 	}
-	err := GetClient().Get(ctx, ok, cld)
+	err := c.Get(ctx, ok, cld)
 	if err != nil {
 		return "", err
 	}
