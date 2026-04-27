@@ -30,6 +30,12 @@ const (
 	TestSafari       = "TEST_SAFARI"
 	TestEdge         = "TEST_EDGE"
 
+	ContainerImage = "CONTAINER_IMAGE"
+	ContainerPath  = "CONTAINER_PATH"
+	GitURL         = "GIT_URL"
+	GitBranch      = "GIT_BRANCH"
+	GitBuildDir    = "GIT_BUILD_DIR"
+
 	// 'DockerRegistry*' - Login credentials for 'registry.redhat.io'.
 	DockerRegistryUsername = "REGISTRY_USERNAME"
 	DockerRegistryPassword = "REGISTRY_PASSWORD"
