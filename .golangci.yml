@@ -1,54 +1,38 @@
-linters-settings:
-  lll:
-    line-length: 170
+version: "2"
+
 linters:
-  enable-all: true
-  disable:
-    - cyclop
-    - deadcode
-    - depguard
-    - dupl
-    - exhaustive
-    - exhaustivestruct
-    - exhaustruct
-    - forbidigo
-    - funlen
-    - gci
-    - gochecknoglobals
-    - gochecknoinits
-    - gocognit
+  default: none
+  enable:
+    - copyloopvar
+    - errcheck
     - goconst
     - gocyclo
-    - godox
-    - goerr113
-    - gofumpt
-    - golint
-    - gomnd
-    - gomoddirectives
-    - ifshort
-    - interfacer
-    - ireturn
-    - lll
-    - maligned
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
     - nakedret
-    - nestif
-    - nilnil
-    - nlreturn
-    - nolintlint
-    - nosnakecase
-    - paralleltest
-    - revive
-    - rowserrcheck
-    - scopelint
-    - structcheck
-    - sqlclosecheck
-    - tagalign
-    - tagliatelle
-    - tenv
-    - testpackage
-    - varcheck
-    - varnamelen
-    - wastedassign
-    - whitespace
-    - wrapcheck
-    - wsl
+    - prealloc
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - errcheck
+        path: (test/|pkg/support/)
+      - linters:
+          - gosec
+        path: (test/|pkg/support/|pkg/kubernetes/|pkg/clients/)
+      - linters:
+          - goconst
+          - prealloc
+          - staticcheck
+        path: test/
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
