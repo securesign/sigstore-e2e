@@ -89,7 +89,8 @@ func createBrowser(browserType BrowserType, headless bool) (*Browser, error) {
 	}
 
 	contextOptions := playwright.BrowserNewContextOptions{
-		AcceptDownloads: playwright.Bool(true),
+		AcceptDownloads:   playwright.Bool(true),
+		IgnoreHttpsErrors: playwright.Bool(true),
 		Viewport: &playwright.Size{
 			Width:  1280,
 			Height: 720,
