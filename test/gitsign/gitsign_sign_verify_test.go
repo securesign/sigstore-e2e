@@ -43,7 +43,7 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 		err    error
 	)
 	BeforeAll(func() {
-		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcIssuerURL, api.RekorURL, api.TufURL)
+		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcIssuerURL, api.RekorURL, api.TufURL, api.FulcioURL)
 		if err != nil {
 			Fail(err.Error())
 		}
@@ -94,6 +94,9 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 			config.Raw.AddOption("tag", "", "gpgsign", "true")
 			config.Raw.AddOption("gpg", "x509", "program", "gitsign")
 			config.Raw.AddOption("gpg", "", "format", "x509")
+			config.Raw.AddOption("gitsign", "", "fulcio", api.GetValueFor(api.FulcioURL))
+			config.Raw.AddOption("gitsign", "", "rekor", api.GetValueFor(api.RekorURL))
+			config.Raw.AddOption("gitsign", "", "issuer", api.GetValueFor(api.OidcIssuerURL))
 
 			Expect(repo.SetConfig(config)).To(Succeed())
 		})
