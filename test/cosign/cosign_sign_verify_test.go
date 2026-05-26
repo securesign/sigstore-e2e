@@ -3,12 +3,14 @@ package cosign
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types/image"
 
@@ -112,12 +114,8 @@ var _ = Describe("Cosign test", Ordered, func() {
 			// Extract logIndex by downloading signature bundles from the registry.
 			// Multiple bundles may exist if the image was signed more than once;
 			// pick the one with the highest logIndex (most recent).
-			bundleOutput, err := cosign.CommandOutput(testsupport.TestContext, "download", "signature", targetImageName)
-			Expect(err).ToNot(HaveOccurred())
-
-			startIdx := strings.Index(string(bundleOutput), "{")
-			Expect(startIdx).NotTo(Equal(-1), "JSON start - '{' not found in bundle output")
-
+			// Retry the download — the registry may not have propagated the
+			// signature immediately after signing.
 			type sigBundle struct {
 				VerificationMaterial struct {
 					TlogEntries []struct {
@@ -127,27 +125,56 @@ var _ = Describe("Cosign test", Ordered, func() {
 				DSSEEnvelope json.RawMessage `json:"dsseEnvelope"`
 			}
 
-			decoder := json.NewDecoder(strings.NewReader(string(bundleOutput[startIdx:])))
-			logIndex = -1
 			var bestBundle sigBundle
-			for decoder.More() {
-				var b sigBundle
-				if err := decoder.Decode(&b); err != nil {
+			var lastErr error
+			logIndex = -1
+			const (
+				maxRetries = 5
+				retryDelay = 2 * time.Second
+			)
+			for attempt := 0; attempt < maxRetries; attempt++ {
+				if attempt > 0 {
+					logrus.Warnf("bundle download: attempt %d/%d (previous: %v)", attempt+1, maxRetries, lastErr)
+					time.Sleep(retryDelay)
+				}
+
+				bundleOutput, err := cosign.CommandOutput(testsupport.TestContext, "download", "signature", targetImageName)
+				if err != nil {
+					lastErr = fmt.Errorf("download failed: %w", err)
+					continue
+				}
+
+				startIdx := strings.Index(string(bundleOutput), "{")
+				if startIdx == -1 {
+					lastErr = fmt.Errorf("no JSON object in bundle output")
+					continue
+				}
+
+				decoder := json.NewDecoder(strings.NewReader(string(bundleOutput[startIdx:])))
+				for decoder.More() {
+					var b sigBundle
+					if err := decoder.Decode(&b); err != nil {
+						break
+					}
+					if len(b.VerificationMaterial.TlogEntries) == 0 {
+						continue
+					}
+					idx, err := strconv.Atoi(strings.Trim(string(b.VerificationMaterial.TlogEntries[0].LogIndex), "\""))
+					if err != nil {
+						continue
+					}
+					if idx > logIndex {
+						logIndex = idx
+						bestBundle = b
+					}
+				}
+
+				if logIndex >= 0 {
 					break
 				}
-				if len(b.VerificationMaterial.TlogEntries) == 0 {
-					continue
-				}
-				idx, err := strconv.Atoi(strings.Trim(string(b.VerificationMaterial.TlogEntries[0].LogIndex), "\""))
-				if err != nil {
-					continue
-				}
-				if idx > logIndex {
-					logIndex = idx
-					bestBundle = b
-				}
+				lastErr = fmt.Errorf("no bundle with valid tlog entry")
 			}
-			Expect(logIndex).To(BeNumerically(">=", 0), "no valid signature bundle found")
+			Expect(logIndex).To(BeNumerically(">=", 0), fmt.Sprintf("no valid signature bundle found after %d attempts: %v", maxRetries, lastErr))
 
 			if len(bestBundle.DSSEEnvelope) > 0 {
 				dsseEnvelopePath = filepath.Join(tempDir, "dsse-envelope.json")
