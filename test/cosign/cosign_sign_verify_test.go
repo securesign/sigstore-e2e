@@ -3,6 +3,7 @@ package cosign
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -125,20 +126,27 @@ var _ = Describe("Cosign test", Ordered, func() {
 			}
 
 			var bestBundle sigBundle
+			var lastErr error
 			logIndex = -1
-			const maxRetries = 5
+			const (
+				maxRetries = 5
+				retryDelay = 2 * time.Second
+			)
 			for attempt := 0; attempt < maxRetries; attempt++ {
 				if attempt > 0 {
-					time.Sleep(2 * time.Second)
+					logrus.Warnf("bundle download: attempt %d/%d (previous: %v)", attempt+1, maxRetries, lastErr)
+					time.Sleep(retryDelay)
 				}
 
 				bundleOutput, err := cosign.CommandOutput(testsupport.TestContext, "download", "signature", targetImageName)
 				if err != nil {
+					lastErr = fmt.Errorf("download failed: %w", err)
 					continue
 				}
 
 				startIdx := strings.Index(string(bundleOutput), "{")
 				if startIdx == -1 {
+					lastErr = fmt.Errorf("no JSON object in bundle output")
 					continue
 				}
 
@@ -164,8 +172,9 @@ var _ = Describe("Cosign test", Ordered, func() {
 				if logIndex >= 0 {
 					break
 				}
+				lastErr = fmt.Errorf("no bundle with valid tlog entry")
 			}
-			Expect(logIndex).To(BeNumerically(">=", 0), "no valid signature bundle found after retries")
+			Expect(logIndex).To(BeNumerically(">=", 0), fmt.Sprintf("no valid signature bundle found after %d attempts: %v", maxRetries, lastErr))
 
 			if len(bestBundle.DSSEEnvelope) > 0 {
 				dsseEnvelopePath = filepath.Join(tempDir, "dsse-envelope.json")
