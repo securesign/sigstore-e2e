@@ -45,15 +45,6 @@ jobs:
         with:
           go-version-file: e2e/go.mod
 
-      - name: Resolve operator image
-        id: operator-image
-        run: |
-          if [ -n "${{ inputs.operator_image }}" ]; then
-            echo "img=${{ inputs.operator_image }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "img=registry.redhat.io/rhtas/rhtas-rhel9-operator:1.4.0" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Log in to GitHub Container Registry
         uses: redhat-actions/podman-login@v1
         with:
@@ -79,8 +70,17 @@ jobs:
           olm: "true"
           prometheus: "true"
 
-      - name: Pull operator image
-        run: podman pull ${{ steps.operator-image.outputs.img }}
+      - name: Build operator image
+        id: operator-image
+        run: |
+          if [ -n "${{ inputs.operator_image }}" ]; then
+            IMG="${{ inputs.operator_image }}"
+            podman pull "$IMG"
+          else
+            IMG="localhost/rhtas-operator:e2e"
+            make docker-build-skip-test IMG="$IMG" CONTAINER_TOOL=podman
+          fi
+          echo "img=$IMG" >> "$GITHUB_OUTPUT"
 
       - name: Load operator image into Kind
         run: |
@@ -90,7 +90,7 @@ jobs:
       - name: Deploy operator
         run: |
           make dev-images generate && cat config/default/images.env
-          IMG=${{ steps.operator-image.outputs.img }} make deploy
+          IMG=${{ steps.operator-image.outputs.img }} TARGET_PLATFORM=kubernetes make deploy
 
       - name: Wait for operator
         run: |
