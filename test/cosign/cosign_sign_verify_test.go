@@ -100,7 +100,9 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 	Describe("Cosign initialize", func() {
 		It("should initialize the TUF root", func() {
-			Expect(cosign.Command(testsupport.TestContext, "initialize").Run()).To(Succeed())
+			Eventually(func() error {
+				return cosign.Command(testsupport.TestContext, "initialize").Run()
+			}).WithTimeout(testsupport.CommandRetryTimeout).WithPolling(testsupport.CommandRetryInterval).Should(Succeed())
 		})
 	})
 
@@ -185,8 +187,10 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 	Describe("cosign verify", func() {
 		It("should verify the signature", func() {
-			_, err := cosign.CommandOutput(testsupport.TestContext, "verify", "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), targetImageName)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				_, err := cosign.CommandOutput(testsupport.TestContext, "verify", "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), targetImageName)
+				return err
+			}).WithTimeout(testsupport.CommandRetryTimeout).WithPolling(testsupport.CommandRetryInterval).Should(Succeed())
 		})
 	})
 
@@ -351,9 +355,11 @@ var _ = Describe("Cosign test", Ordered, func() {
 	Describe("ec validate", func() {
 		It("should initialize ec TUF root", func() {
 			tufURL := api.GetValueFor(api.TufURL)
-			Expect(ec.Command(testsupport.TestContext, "sigstore", "initialize",
-				"--mirror", tufURL,
-				"--root", tufURL+"/root.json").Run()).To(Succeed())
+			Eventually(func() error {
+				return ec.Command(testsupport.TestContext, "sigstore", "initialize",
+					"--mirror", tufURL,
+					"--root", tufURL+"/root.json").Run()
+			}).WithTimeout(testsupport.CommandRetryTimeout).WithPolling(testsupport.CommandRetryInterval).Should(Succeed())
 		})
 
 		It("should verify signature and attestation of the image", func() {

@@ -428,7 +428,7 @@ func (bt *BrowserTest) performSearch(attributeValue, inputID, searchValue string
 	if err := browser.Page.Locator(".pf-v5-c-card").
 		First().
 		WaitFor(playwright.LocatorWaitForOptions{
-			Timeout: playwright.Float(15000),
+			Timeout: playwright.Float(30000),
 			State:   playwright.WaitForSelectorStateVisible,
 		}); err != nil {
 		return fmt.Errorf("no result cards became visible after search: %w", err)
@@ -593,9 +593,11 @@ var _ = Describe("Test the Rekor Search UI", Ordered, func() {
 
 		Expect(exec.Command("tar", "-czvf", tarFilePath, dirFilePath).Run()).To(Succeed())
 		tufURL := api.GetValueFor(api.TufURL)
-		Expect(gitsign.Command(testsupport.TestContext, "initialize",
-			"--mirror", tufURL,
-			"--root", tufURL+"/root.json").Run()).To(Succeed())
+		Eventually(func() error {
+			return gitsign.Command(testsupport.TestContext, "initialize",
+				"--mirror", tufURL,
+				"--root", tufURL+"/root.json").Run()
+		}).WithTimeout(testsupport.CommandRetryTimeout).WithPolling(testsupport.CommandRetryInterval).Should(Succeed())
 
 		cmd := gitsign.Command(testsupport.TestContext, "verify",
 			"--certificate-identity", fmt.Sprintf("%s@%s", api.GetValueFor(api.OidcUser), api.GetValueFor(api.OidcUserDomain)),

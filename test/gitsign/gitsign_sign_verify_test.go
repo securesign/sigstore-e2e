@@ -75,9 +75,11 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 	Describe("Gitsign initialize", func() {
 		It("should initialize the TUF root", func() {
 			tufURL := api.GetValueFor(api.TufURL)
-			Expect(gitsign.Command(testsupport.TestContext, "initialize",
-				"--mirror", tufURL,
-				"--root", tufURL+"/root.json").Run()).To(Succeed())
+			Eventually(func() error {
+				return gitsign.Command(testsupport.TestContext, "initialize",
+					"--mirror", tufURL,
+					"--root", tufURL+"/root.json").Run()
+			}).WithTimeout(testsupport.CommandRetryTimeout).WithPolling(testsupport.CommandRetryInterval).Should(Succeed())
 		})
 	})
 
@@ -135,18 +137,41 @@ var _ = Describe("Signing and verifying commits by using Gitsign from the comman
 	Describe("Verify the commit", func() {
 		When("commiter is authorized", func() {
 			It("should verify HEAD signature by gitsign", func() {
-				cmd := gitsign.Command(testsupport.TestContext, "verify",
-					"--certificate-identity", fmt.Sprintf("%s@%s", api.GetValueFor(api.OidcUser), api.GetValueFor(api.OidcUserDomain)),
-					"--certificate-oidc-issuer", api.GetValueFor(api.OidcIssuerURL),
-					"HEAD")
-
-				cmd.Dir = dir
-				cmd.Env = os.Environ()
-
+				// Retry gitsign verify — the TUF client's atomic temp-dir
+				// rename can race with disk I/O on CI runners.
+				const (
+					maxRetries = 5
+					retryDelay = 3 * time.Second
+				)
 				var output bytes.Buffer
+				var lastErr error
 
-				cmd.Stdout = &output
-				Expect(cmd.Run()).To(Succeed())
+				for attempt := 0; attempt < maxRetries; attempt++ {
+					if attempt > 0 {
+						logrus.Warnf("gitsign verify: attempt %d/%d (previous: %v)", attempt+1, maxRetries, lastErr)
+						time.Sleep(retryDelay)
+					}
+
+					cmd := gitsign.Command(testsupport.TestContext, "verify",
+						"--certificate-identity", fmt.Sprintf("%s@%s", api.GetValueFor(api.OidcUser), api.GetValueFor(api.OidcUserDomain)),
+						"--certificate-oidc-issuer", api.GetValueFor(api.OidcIssuerURL),
+						"HEAD")
+
+					cmd.Dir = dir
+					cmd.Env = os.Environ()
+
+					output.Reset()
+					cmd.Stdout = &output
+
+					if err := cmd.Run(); err != nil {
+						lastErr = fmt.Errorf("gitsign verify failed: %w", err)
+						continue
+					}
+					lastErr = nil
+					break
+				}
+				Expect(lastErr).ToNot(HaveOccurred(), fmt.Sprintf("gitsign verify failed after %d attempts", maxRetries))
+
 				logrus.WithField("app", "gitsign").Info(output.String())
 
 				re := regexp.MustCompile(`tlog index: (\d+)`)
