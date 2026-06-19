@@ -25,6 +25,12 @@ const (
 var (
 	TestContext       context.Context
 	TestTimeoutMedium = 5 * time.Minute
+
+	// CommandRetryTimeout is the maximum time to retry transient command
+	// failures (e.g. TUF httpd returning 503 during cosign/gitsign init).
+	CommandRetryTimeout  = 2 * time.Minute
+	CommandRetryInterval = 10 * time.Second
+
 	// Config keys that must be defined for any test.
 	mandatoryAPIConfigKeys = []string{api.OidcIssuerURL, api.FulcioURL, api.RekorURL, api.TufURL, api.TsaURL}
 )

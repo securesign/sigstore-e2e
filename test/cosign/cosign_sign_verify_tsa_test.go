@@ -82,7 +82,9 @@ var _ = Describe("TSA test", Ordered, func() {
 
 	Describe("Cosign initialize", func() {
 		It("should initialize the cosign root", func() {
-			Expect(cosign.Command(testsupport.TestContext, "initialize").Run()).To(Succeed())
+			Eventually(func() error {
+				return cosign.Command(testsupport.TestContext, "initialize").Run()
+			}).WithTimeout(testsupport.CommandRetryTimeout).WithPolling(testsupport.CommandRetryInterval).Should(Succeed())
 		})
 	})
 
@@ -115,7 +117,9 @@ var _ = Describe("TSA test", Ordered, func() {
 
 	Describe("cosign verify tsa", func() {
 		It("should verify the signature using TSA", func() {
-			Expect(cosign.Command(testsupport.TestContext, "verify", "--timestamp-certificate-chain", tsaChainPath, "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), tsaTargetImageName).Run()).To(Succeed())
+			Eventually(func() error {
+				return cosign.Command(testsupport.TestContext, "verify", "--timestamp-certificate-chain", tsaChainPath, "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), tsaTargetImageName).Run()
+			}).WithTimeout(testsupport.CommandRetryTimeout).WithPolling(testsupport.CommandRetryInterval).Should(Succeed())
 		})
 	})
 })

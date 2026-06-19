@@ -96,7 +96,9 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 	Describe("Cosign initialize", func() {
 		It("should initialize the cosign root", func() {
-			Expect(cosign.Command(testsupport.TestContext, "initialize").Run()).To(Succeed())
+			Eventually(func() error {
+				return cosign.Command(testsupport.TestContext, "initialize").Run()
+			}).WithTimeout(testsupport.CommandRetryTimeout).WithPolling(testsupport.CommandRetryInterval).Should(Succeed())
 		})
 	})
 
@@ -110,8 +112,12 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 	Describe("cosign verify", func() {
 		It("should verify the signature and extract logIndex", func() {
-			output, err := cosign.CommandOutput(testsupport.TestContext, "verify", "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), targetImageName)
-			Expect(err).ToNot(HaveOccurred())
+			var output []byte
+			Eventually(func() error {
+				var err error
+				output, err = cosign.CommandOutput(testsupport.TestContext, "verify", "--certificate-identity-regexp", ".*"+regexp.QuoteMeta(api.GetValueFor(api.OidcUserDomain)), "--certificate-oidc-issuer-regexp", regexp.QuoteMeta(api.GetValueFor(api.OidcIssuerURL)), targetImageName)
+				return err
+			}).WithTimeout(testsupport.CommandRetryTimeout).WithPolling(testsupport.CommandRetryInterval).Should(Succeed())
 
 			startIndex := strings.Index(string(output), "[")
 			Expect(startIndex).NotTo(Equal(-1), "JSON start - '[' not found")
@@ -119,7 +125,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 			jsonStr := string(output[startIndex:])
 
 			var cosignVerifyOutput testsupport.CosignVerifyOutput
-			err = json.Unmarshal([]byte(jsonStr), &cosignVerifyOutput)
+			err := json.Unmarshal([]byte(jsonStr), &cosignVerifyOutput)
 			Expect(err).ToNot(HaveOccurred())
 
 			logIndex = cosignVerifyOutput[0].Optional.Bundle.Payload.LogIndex
