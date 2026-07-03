@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	consoleV1 "github.com/openshift/api/console/v1"
@@ -22,11 +23,14 @@ func ConsoleCLIDownload(ctx context.Context, c controller.Reader, cli string, os
 		// Match old cli-server format (clients/<os>/<binary>-<arch>.gz)
 		// and new content gateway format (<binary>_<os>_<arch>.tar.gz)
 		matchOS := strings.Contains(link.Href, "/"+os+"/") || strings.Contains(link.Href, "_"+os+"_")
-		matchArch := strings.Contains(link.Href, arch)
+		matchArch := strings.Contains(link.Href, "-"+arch+".") || strings.Contains(link.Href, "_"+arch+".")
 
 		if matchOS && matchArch {
 			target = link.Href
 		}
+	}
+	if target == "" {
+		return "", fmt.Errorf("no download link found for %s on %s/%s", cli, os, arch)
 	}
 	return target, nil
 }

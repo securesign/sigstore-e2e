@@ -132,11 +132,32 @@ func TestStrategyContentGatewayNameOverride(t *testing.T) {
 	t.Logf("OK: gitsign -> %s", path)
 }
 
-func TestStrategyError(t *testing.T) {
+func TestStrategyErrorNotFound(t *testing.T) {
 	fakeClient := newFakeClient(t).Build()
 
 	_, err := download(t.Context(), fakeClient, "nonexistent")
 	if err == nil {
 		t.Fatal("expected error for nonexistent CLI download")
 	}
+}
+
+func TestStrategyErrorNoMatchingLink(t *testing.T) {
+	cliDownload := consoleV1.ConsoleCLIDownload{
+		ObjectMeta: metav1.ObjectMeta{Name: "testcli"},
+		Spec: consoleV1.ConsoleCLIDownloadSpec{
+			DisplayName: "Test CLI",
+			Description: "test binary",
+			Links: []consoleV1.CLIDownloadLink{
+				{Text: "Download for SomeOtherOS", Href: "https://example.com/testcli_fakeos_fakearch.tar.gz"},
+			},
+		},
+	}
+
+	fakeClient := newFakeClient(t, cliDownload).Build()
+
+	_, err := download(t.Context(), fakeClient, "testcli")
+	if err == nil {
+		t.Fatal("expected error when no link matches the current OS/arch")
+	}
+	t.Logf("OK: got expected error: %v", err)
 }

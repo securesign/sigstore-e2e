@@ -2,9 +2,8 @@ package openshift
 
 import (
 	"context"
-	"fmt"
+	"net/url"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -14,18 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 	controller "sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-var cgwNameOverride = map[string]string{
-	"gitsign":   "gitsign_cli",
-	"rekor-cli": "rekor_cli",
-}
-
-func contentGatewayName(name string) string {
-	if override, ok := cgwNameOverride[name]; ok {
-		return override
-	}
-	return strings.ReplaceAll(name, "-", "_")
-}
 
 func init() {
 	strategy.Register("openshift", func() strategy.Strategy {
@@ -42,10 +29,18 @@ func download(ctx context.Context, client controller.Reader, cliName string) (st
 		return "", err
 	}
 
-	if strings.HasSuffix(link, ".tar.gz") {
+	if isTarGz(link) {
 		return downloadTarGz(ctx, cliName, link)
 	}
 	return strategy.DownloadFromLink(ctx, cliName, link)
+}
+
+func isTarGz(link string) bool {
+	u, err := url.Parse(link)
+	if err != nil {
+		return strings.HasSuffix(link, ".tar.gz")
+	}
+	return strings.HasSuffix(u.Path, ".tar.gz")
 }
 
 func downloadTarGz(ctx context.Context, cliName string, link string) (string, error) {
@@ -60,24 +55,5 @@ func downloadTarGz(ctx context.Context, cliName string, link string) (string, er
 		return "", err
 	}
 
-	cgwName := contentGatewayName(cliName)
-	candidates := []string{
-		cliName,
-		fmt.Sprintf("%s_%s_%s", cgwName, runtime.GOOS, runtime.GOARCH),
-		fmt.Sprintf("%s-%s-%s", cliName, runtime.GOOS, runtime.GOARCH),
-	}
-	if runtime.GOOS == "windows" {
-		for i, name := range candidates {
-			candidates[i] = name + ".exe"
-		}
-	}
-
-	for _, name := range candidates {
-		path := filepath.Join(tmp, name)
-		if _, err = os.Stat(path); err == nil {
-			return path, nil
-		}
-	}
-
-	return "", fmt.Errorf("binary for '%s' not found in extracted archive from %s (tried %v)", cliName, link, candidates)
+	return support.FindBinary(tmp, cliName, runtime.GOOS, runtime.GOARCH)
 }
