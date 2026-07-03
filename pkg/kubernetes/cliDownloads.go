@@ -2,7 +2,6 @@ package kubernetes
 
 import (
 	"context"
-	"regexp"
 	"strings"
 
 	consoleV1 "github.com/openshift/api/console/v1"
@@ -20,7 +19,9 @@ func ConsoleCLIDownload(ctx context.Context, c controller.Reader, cli string, os
 	}
 	var target string
 	for _, link := range cld.Spec.Links {
-		matchOS, _ := regexp.MatchString("clients/"+os+"/", link.Href)
+		// Match old cli-server format (clients/<os>/<binary>-<arch>.gz)
+		// and new content gateway format (<binary>_<os>_<arch>.tar.gz)
+		matchOS := strings.Contains(link.Href, "/"+os+"/") || strings.Contains(link.Href, "_"+os+"_")
 		matchArch := strings.Contains(link.Href, arch)
 
 		if matchOS && matchArch {
