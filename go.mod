@@ -1,6 +1,6 @@
 module github.com/securesign/sigstore-e2e
 
-go 1.21
+go 1.22
 
 replace github.com/go-jose/go-jose/v3 => github.com/go-jose/go-jose/v4 v4.0.5
 
@@ -13,7 +13,7 @@ require (
 	github.com/onsi/gomega v1.27.10
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/openshift/api v0.0.0-20230817133225-564be9ddb58e
-	github.com/playwright-community/playwright-go v0.4701.0
+	github.com/playwright-community/playwright-go v0.5700.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.17.0
 	github.com/testcontainers/testcontainers-go/modules/registry v0.33.0
@@ -24,8 +24,8 @@ require (
 
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24 // indirect
-	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
+	github.com/deckarep/golang-set/v2 v2.8.0 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.19.0 // indirect
