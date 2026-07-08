@@ -9,11 +9,11 @@ require (
 	github.com/go-git/go-git/v5 v5.9.0
 	github.com/google/go-containerregistry v0.20.2
 	github.com/google/uuid v1.6.0
+	github.com/mxschmitt/playwright-go v0.6100.0
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.10
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/openshift/api v0.0.0-20230817133225-564be9ddb58e
-	github.com/playwright-community/playwright-go v0.6000.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.17.0
 	github.com/testcontainers/testcontainers-go/modules/registry v0.33.0

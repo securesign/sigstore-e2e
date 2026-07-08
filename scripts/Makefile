@@ -39,7 +39,7 @@ test:
 
 setup:
 	@echo "Installing Playwright dependencies..."
-	@go run github.com/playwright-community/playwright-go/cmd/playwright install
+	@go run github.com/mxschmitt/playwright-go/cmd/playwright install
 
 
 .PHONY: build test setup all 
