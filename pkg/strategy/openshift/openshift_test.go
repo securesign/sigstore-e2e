@@ -68,7 +68,7 @@ func TestStrategyContentGateway(t *testing.T) {
 	binaryContent := []byte("#!/bin/sh\necho testcli\n")
 	binaryName := "testcli_" + runtime.GOOS + "_" + runtime.GOARCH
 	tarGz := testutil.BuildTarGz(t, map[string][]byte{binaryName: binaryContent})
-	expectedPath := "/cgw/RHTAS/1.4.0/testcli_" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz"
+	expectedPath := "/RHTAS/1.4.1/testcli_" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz"
 
 	srv := testutil.ServeBinary(t, expectedPath, tarGz)
 
@@ -78,11 +78,11 @@ func TestStrategyContentGateway(t *testing.T) {
 			DisplayName: "testcli - Command Line Interface (CLI)",
 			Description: "test binary",
 			Links: []consoleV1.CLIDownloadLink{
-				{Text: "Download testcli for Linux x86_64", Href: srv.URL + "/cgw/RHTAS/1.4.0/testcli_linux_amd64.tar.gz"},
-				{Text: "Download testcli for Linux arm64", Href: srv.URL + "/cgw/RHTAS/1.4.0/testcli_linux_arm64.tar.gz"},
-				{Text: "Download testcli for Mac x86_64", Href: srv.URL + "/cgw/RHTAS/1.4.0/testcli_darwin_amd64.tar.gz"},
-				{Text: "Download testcli for Mac arm64", Href: srv.URL + "/cgw/RHTAS/1.4.0/testcli_darwin_arm64.tar.gz"},
-				{Text: "Download testcli for Windows x86_64", Href: srv.URL + "/cgw/RHTAS/1.4.0/testcli_windows_amd64.zip"},
+				{Text: "Download testcli for Linux x86_64", Href: srv.URL + "/RHTAS/1.4.1/testcli_linux_amd64.tar.gz"},
+				{Text: "Download testcli for Linux arm64", Href: srv.URL + "/RHTAS/1.4.1/testcli_linux_arm64.tar.gz"},
+				{Text: "Download testcli for Mac x86_64", Href: srv.URL + "/RHTAS/1.4.1/testcli_darwin_amd64.tar.gz"},
+				{Text: "Download testcli for Mac arm64", Href: srv.URL + "/RHTAS/1.4.1/testcli_darwin_arm64.tar.gz"},
+				{Text: "Download testcli for Windows x86_64", Href: srv.URL + "/RHTAS/1.4.1/testcli_windows_amd64.zip"},
 			},
 		},
 	}
@@ -102,7 +102,7 @@ func TestStrategyContentGatewayNameOverride(t *testing.T) {
 	binaryContent := []byte("#!/bin/sh\necho gitsign\n")
 	binaryName := "gitsign_cli_" + runtime.GOOS + "_" + runtime.GOARCH
 	tarGz := testutil.BuildTarGz(t, map[string][]byte{binaryName: binaryContent})
-	expectedPath := "/cgw/RHTAS/1.4.0/gitsign_cli_" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz"
+	expectedPath := "/RHTAS/1.4.1/gitsign_cli_" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz"
 
 	srv := testutil.ServeBinary(t, expectedPath, tarGz)
 
@@ -112,11 +112,11 @@ func TestStrategyContentGatewayNameOverride(t *testing.T) {
 			DisplayName: "gitsign - Command Line Interface (CLI)",
 			Description: "gitsign is a CLI tool that allows you to digitally sign and verify git commits.",
 			Links: []consoleV1.CLIDownloadLink{
-				{Text: "Download gitsign for Linux x86_64", Href: srv.URL + "/cgw/RHTAS/1.4.0/gitsign_cli_linux_amd64.tar.gz"},
-				{Text: "Download gitsign for Linux arm64", Href: srv.URL + "/cgw/RHTAS/1.4.0/gitsign_cli_linux_arm64.tar.gz"},
-				{Text: "Download gitsign for Mac x86_64", Href: srv.URL + "/cgw/RHTAS/1.4.0/gitsign_cli_darwin_amd64.tar.gz"},
-				{Text: "Download gitsign for Mac arm64", Href: srv.URL + "/cgw/RHTAS/1.4.0/gitsign_cli_darwin_arm64.tar.gz"},
-				{Text: "Download gitsign for Windows x86_64", Href: srv.URL + "/cgw/RHTAS/1.4.0/gitsign_cli_windows_amd64.zip"},
+				{Text: "Download gitsign for Linux x86_64", Href: srv.URL + "/RHTAS/1.4.1/gitsign_cli_linux_amd64.tar.gz"},
+				{Text: "Download gitsign for Linux arm64", Href: srv.URL + "/RHTAS/1.4.1/gitsign_cli_linux_arm64.tar.gz"},
+				{Text: "Download gitsign for Mac x86_64", Href: srv.URL + "/RHTAS/1.4.1/gitsign_cli_darwin_amd64.tar.gz"},
+				{Text: "Download gitsign for Mac arm64", Href: srv.URL + "/RHTAS/1.4.1/gitsign_cli_darwin_arm64.tar.gz"},
+				{Text: "Download gitsign for Windows x86_64", Href: srv.URL + "/RHTAS/1.4.1/gitsign_cli_windows_amd64.zip"},
 			},
 		},
 	}
