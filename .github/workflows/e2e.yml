@@ -131,7 +131,7 @@ jobs:
 
           source ./tas-env-variables.sh
 
-          go run github.com/playwright-community/playwright-go/cmd/playwright install --with-deps
+          go run github.com/mxschmitt/playwright-go/cmd/playwright install --with-deps
           go test -v ./test/...
 
       - name: Dump operator logs
