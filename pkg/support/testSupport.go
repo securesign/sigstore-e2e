@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/registry"
@@ -65,11 +66,8 @@ func DownloadAndUnzip(ctx context.Context, link string, writer io.Writer) error 
 	pr, pw := io.Pipe()
 
 	go func() {
-		defer pw.Close()
-		if _, err := Download(ctx, link, pw); err != nil {
-			panic(err)
-		}
-
+		_, err := Download(ctx, link, pw)
+		pw.CloseWithError(err)
 	}()
 	return Gunzip(pr, writer)
 }
@@ -78,30 +76,47 @@ func DownloadAndUntarArchive(ctx context.Context, link string, dst string) error
 	pr, pw := io.Pipe()
 
 	go func() {
-		defer pw.Close()
-		if _, err := Download(ctx, link, pw); err != nil {
-			panic(err)
-		}
+		_, err := Download(ctx, link, pw)
+		pw.CloseWithError(err)
 	}()
 	return UntarArchive(dst, pr)
 }
 
 func Download(ctx context.Context, link string, writer io.Writer) (int64, error) {
 	client := &http.Client{Timeout: 2 * time.Minute} //nolint:mnd
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
-	if err != nil {
-		return 0, err
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return 0, err
-	}
 
-	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("bad status: %s", resp.Status)
+	const maxRetries = 5
+	var lastErr error
+	for attempt := range maxRetries {
+		if attempt > 0 {
+			delay := time.Duration(1<<uint(attempt-1)) * time.Second
+			logrus.Infof("Retrying download (%d/%d) after %v: %s", attempt+1, maxRetries, delay, link)
+			select {
+			case <-ctx.Done():
+				return 0, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
+		if err != nil {
+			return 0, err
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("bad status: %s", resp.Status)
+			continue
+		}
+		defer resp.Body.Close()
+		return io.Copy(writer, resp.Body)
 	}
-	defer resp.Body.Close()
-	return io.Copy(writer, resp.Body)
+	return 0, fmt.Errorf("download failed after %d attempts: %w", maxRetries, lastErr)
 }
 
 func Gunzip(reader io.Reader, writer io.Writer) error {
@@ -155,8 +170,11 @@ func UntarArchive(dst string, r io.Reader) error {
 			continue
 		}
 
-		// the target location where the dir/file should be created
-		target := filepath.Join(dst, header.Name) // #nosec G305 - We don't expect file traversal attack on test ENV
+		clean := filepath.Clean(header.Name)
+		if filepath.IsAbs(clean) || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) || clean == ".." {
+			return fmt.Errorf("tar entry %q contains path traversal", header.Name)
+		}
+		target := filepath.Join(dst, clean) // #nosec G305
 
 		// check the file type
 		switch header.Typeflag {
