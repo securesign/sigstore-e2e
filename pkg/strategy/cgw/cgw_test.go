@@ -9,6 +9,7 @@ import (
 
 	"github.com/securesign/sigstore-e2e/pkg/strategy"
 	"github.com/securesign/sigstore-e2e/pkg/strategy/testutil"
+	"github.com/securesign/sigstore-e2e/pkg/support"
 )
 
 func TestContentGatewayName(t *testing.T) {
@@ -26,9 +27,9 @@ func TestContentGatewayName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			got := contentGatewayName(tt.input)
+			got := support.ContentGatewayName(tt.input)
 			if got != tt.expected {
-				t.Errorf("contentGatewayName(%q) = %q, want %q", tt.input, got, tt.expected)
+				t.Errorf("ContentGatewayName(%q) = %q, want %q", tt.input, got, tt.expected)
 			}
 		})
 	}
@@ -42,7 +43,7 @@ func TestRegistered(t *testing.T) {
 
 func TestStrategy(t *testing.T) {
 	binaryContent := []byte("#!/bin/sh\necho cosign\n")
-	archiveName := fmt.Sprintf("%s_%s_%s.tar.gz", contentGatewayName("cosign"), runtime.GOOS, runtime.GOARCH)
+	archiveName := fmt.Sprintf("%s_%s_%s.tar.gz", support.ContentGatewayName("cosign"), runtime.GOOS, runtime.GOARCH)
 
 	archive := testutil.BuildTarGz(t, map[string][]byte{
 		"cosign": binaryContent,
@@ -61,7 +62,7 @@ func TestStrategy(t *testing.T) {
 
 func TestStrategyNameOverride(t *testing.T) {
 	binaryContent := []byte("#!/bin/sh\necho gitsign\n")
-	cgwName := contentGatewayName("gitsign")
+	cgwName := support.ContentGatewayName("gitsign")
 	archiveName := fmt.Sprintf("%s_%s_%s.tar.gz", cgwName, runtime.GOOS, runtime.GOARCH)
 	binaryName := fmt.Sprintf("%s_%s_%s", cgwName, runtime.GOOS, runtime.GOARCH)
 

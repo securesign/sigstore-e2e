@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -13,18 +12,6 @@ import (
 	"github.com/securesign/sigstore-e2e/pkg/support"
 	"github.com/sirupsen/logrus"
 )
-
-var cgwNameOverride = map[string]string{
-	"gitsign":   "gitsign_cli",
-	"rekor-cli": "rekor_cli",
-}
-
-func contentGatewayName(name string) string {
-	if override, ok := cgwNameOverride[name]; ok {
-		return override
-	}
-	return strings.ReplaceAll(name, "-", "_")
-}
 
 func init() {
 	strategy.Register("cgw", func() strategy.Strategy {
@@ -39,7 +26,7 @@ func init() {
 }
 
 func download(ctx context.Context, cgwURL string, cliName string) (string, error) {
-	cgwName := contentGatewayName(cliName)
+	cgwName := support.ContentGatewayName(cliName)
 	archiveName := fmt.Sprintf("%s_%s_%s.tar.gz", cgwName, runtime.GOOS, runtime.GOARCH)
 	link := fmt.Sprintf("%s/%s", strings.TrimRight(cgwURL, "/"), archiveName)
 
@@ -54,23 +41,5 @@ func download(ctx context.Context, cgwURL string, cliName string) (string, error
 		return "", err
 	}
 
-	candidates := []string{
-		cliName,
-		fmt.Sprintf("%s_%s_%s", cgwName, runtime.GOOS, runtime.GOARCH),
-		fmt.Sprintf("%s-%s-%s", cliName, runtime.GOOS, runtime.GOARCH),
-	}
-	if runtime.GOOS == "windows" {
-		for i, name := range candidates {
-			candidates[i] = name + ".exe"
-		}
-	}
-
-	for _, name := range candidates {
-		path := filepath.Join(tmp, name)
-		if _, err = os.Stat(path); err == nil {
-			return path, nil
-		}
-	}
-
-	return "", fmt.Errorf("binary for '%s' not found in extracted archive from %s (tried %v)", cliName, link, candidates)
+	return support.FindBinary(tmp, cliName, runtime.GOOS, runtime.GOARCH)
 }
