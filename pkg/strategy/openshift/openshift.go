@@ -22,6 +22,11 @@ func init() {
 	})
 }
 
+const (
+	prodHost    = "developers.redhat.com"
+	stagingHost = "developers.qa.redhat.com"
+)
+
 func download(ctx context.Context, client controller.Reader, cliName string) (string, error) {
 	logrus.Info("Getting binary '", cliName, "' from Openshift")
 	link, err := kubernetes.ConsoleCLIDownload(ctx, client, cliName, runtime.GOOS, runtime.GOARCH)
@@ -30,7 +35,13 @@ func download(ctx context.Context, client controller.Reader, cliName string) (st
 	}
 
 	if isTarGz(link) {
-		return downloadTarGz(ctx, cliName, link)
+		path, err := downloadTarGz(ctx, cliName, link)
+		if err != nil && strings.Contains(link, prodHost) {
+			stagingLink := strings.Replace(link, prodHost, stagingHost, 1)
+			logrus.Infof("Production download failed, falling back to staging: %s", stagingLink)
+			return downloadTarGz(ctx, cliName, stagingLink)
+		}
+		return path, err
 	}
 	return strategy.DownloadFromLink(ctx, cliName, link)
 }
