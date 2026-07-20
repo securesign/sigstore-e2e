@@ -142,6 +142,38 @@ func Download(ctx context.Context, link string, writer io.Writer) (int64, error)
 	return 0, fmt.Errorf("download failed after %d attempts: %w", maxRetries, lastErr)
 }
 
+func ResolveCDNLink(ctx context.Context, link string) (string, error) {
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusFound && resp.StatusCode != http.StatusMovedPermanently {
+		return "", fmt.Errorf("expected redirect, got %s", resp.Status)
+	}
+	location := resp.Header.Get("Location")
+	parsed, err := url.Parse(location)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse redirect location: %w", err)
+	}
+	cdnURL := parsed.Query().Get("tcDownloadURL")
+	if cdnURL == "" {
+		return "", fmt.Errorf("tcDownloadURL not found in redirect location")
+	}
+	return cdnURL, nil
+}
+
 func Gunzip(reader io.Reader, writer io.Writer) error {
 	gzreader, err := gzip.NewReader(reader)
 	if err != nil {
