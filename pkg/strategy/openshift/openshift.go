@@ -72,7 +72,7 @@ func downloadTarGz(ctx context.Context, cliName string, link string) (string, er
 	}
 
 	if err = support.DownloadAndUntarArchive(ctx, link, tmp); err != nil {
-		os.RemoveAll(tmp)
+		_ = os.RemoveAll(tmp)
 		return "", err
 	}
 
