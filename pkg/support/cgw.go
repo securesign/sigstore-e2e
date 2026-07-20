@@ -26,6 +26,7 @@ func FindBinary(dir, cliName, goos, goarch string) (string, error) {
 	candidates := []string{
 		cliName,
 		fmt.Sprintf("%s_%s_%s", cgwName, goos, goarch),
+		fmt.Sprintf("%s_%s", cgwName, goos),
 		fmt.Sprintf("%s-%s-%s", cliName, goos, goarch),
 	}
 	if goos == "windows" {
