@@ -23,12 +23,15 @@ func ContentGatewayName(name string) string {
 // FindBinary searches for a CLI binary in the given directory using candidate name patterns.
 func FindBinary(dir, cliName, goos, goarch string) (string, error) {
 	cgwName := ContentGatewayName(cliName)
-	candidates := []string{
-		cliName,
+	candidates := []string{cliName}
+	if cgwName != cliName {
+		candidates = append(candidates, cgwName)
+	}
+	candidates = append(candidates,
 		fmt.Sprintf("%s_%s_%s", cgwName, goos, goarch),
 		fmt.Sprintf("%s_%s", cgwName, goos),
 		fmt.Sprintf("%s-%s-%s", cliName, goos, goarch),
-	}
+	)
 	if goos == "windows" {
 		for i, name := range candidates {
 			candidates[i] = name + ".exe"
@@ -38,6 +41,12 @@ func FindBinary(dir, cliName, goos, goarch string) (string, error) {
 	for _, name := range candidates {
 		path := filepath.Join(dir, name)
 		if _, err := os.Stat(path); err == nil {
+			if name != cliName {
+				link := filepath.Join(dir, cliName)
+				if err := os.Symlink(path, link); err == nil {
+					return link, nil
+				}
+			}
 			return path, nil
 		}
 	}

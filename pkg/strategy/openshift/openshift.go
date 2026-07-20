@@ -26,8 +26,7 @@ func init() {
 
 const (
 	prodHost        = "developers.redhat.com"
-	stagingHost     = "developers.qa.redhat.com"
-	fallbackVersion = "1.4.1"
+	fallbackVersion = "1.4.2"
 )
 
 var versionRegexp = regexp.MustCompile(`/RHTAS/[^/]+/`)
@@ -42,20 +41,14 @@ func download(ctx context.Context, client controller.Reader, cliName string) (st
 	if isTarGz(link) {
 		path, err := downloadTarGz(ctx, cliName, link)
 		if err != nil && strings.Contains(link, prodHost) {
-			stagingLink := strings.Replace(link, prodHost, stagingHost, 1)
-			logrus.Infof("Production download failed, falling back to staging: %s", stagingLink)
-			path, err = downloadTarGz(ctx, cliName, stagingLink)
-			if err != nil {
-				fallbackLink := versionRegexp.ReplaceAllString(link, "/RHTAS/"+fallbackVersion+"/")
-				logrus.Infof("Staging download failed, falling back to stable %s via CDN: %s", fallbackVersion, fallbackLink)
-				cdnLink, cdnErr := support.ResolveCDNLink(ctx, fallbackLink)
-				if cdnErr != nil {
-					return "", fmt.Errorf("all download attempts failed (prod, staging, CDN fallback): %w", cdnErr)
-				}
-				logrus.Infof("Resolved CDN link: %s", cdnLink)
-				return downloadTarGz(ctx, cliName, cdnLink)
+			fallbackLink := versionRegexp.ReplaceAllString(link, "/RHTAS/"+fallbackVersion+"/")
+			logrus.Infof("Download failed, falling back to stable %s via CDN: %s", fallbackVersion, fallbackLink)
+			cdnLink, cdnErr := support.ResolveCDNLink(ctx, fallbackLink)
+			if cdnErr != nil {
+				return "", fmt.Errorf("all download attempts failed (current version, CDN fallback %s): %w", fallbackVersion, cdnErr)
 			}
-			return path, nil
+			logrus.Infof("Resolved CDN link: %s", cdnLink)
+			return downloadTarGz(ctx, cliName, cdnLink)
 		}
 		return path, err
 	}
@@ -79,6 +72,7 @@ func downloadTarGz(ctx context.Context, cliName string, link string) (string, er
 	}
 
 	if err = support.DownloadAndUntarArchive(ctx, link, tmp); err != nil {
+		os.RemoveAll(tmp)
 		return "", err
 	}
 
