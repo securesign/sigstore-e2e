@@ -2,8 +2,10 @@ package openshift
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -23,9 +25,12 @@ func init() {
 }
 
 const (
-	prodHost    = "developers.redhat.com"
-	stagingHost = "developers.qa.redhat.com"
+	prodHost        = "developers.redhat.com"
+	stagingHost     = "developers.qa.redhat.com"
+	fallbackVersion = "1.4.1"
 )
+
+var versionRegexp = regexp.MustCompile(`/RHTAS/[^/]+/`)
 
 func download(ctx context.Context, client controller.Reader, cliName string) (string, error) {
 	logrus.Info("Getting binary '", cliName, "' from Openshift")
@@ -39,7 +44,18 @@ func download(ctx context.Context, client controller.Reader, cliName string) (st
 		if err != nil && strings.Contains(link, prodHost) {
 			stagingLink := strings.Replace(link, prodHost, stagingHost, 1)
 			logrus.Infof("Production download failed, falling back to staging: %s", stagingLink)
-			return downloadTarGz(ctx, cliName, stagingLink)
+			path, err = downloadTarGz(ctx, cliName, stagingLink)
+			if err != nil {
+				fallbackLink := versionRegexp.ReplaceAllString(link, "/RHTAS/"+fallbackVersion+"/")
+				logrus.Infof("Staging download failed, falling back to stable %s via CDN: %s", fallbackVersion, fallbackLink)
+				cdnLink, cdnErr := support.ResolveCDNLink(ctx, fallbackLink)
+				if cdnErr != nil {
+					return "", fmt.Errorf("all download attempts failed (prod, staging, CDN fallback): %w", cdnErr)
+				}
+				logrus.Infof("Resolved CDN link: %s", cdnLink)
+				return downloadTarGz(ctx, cliName, cdnLink)
+			}
+			return path, nil
 		}
 		return path, err
 	}
