@@ -65,6 +65,7 @@ func GitCloneWithAuth(url string, auth transport.AuthMethod) (string, *git.Repos
 
 func DownloadAndUnzip(ctx context.Context, link string, writer io.Writer) error {
 	pr, pw := io.Pipe()
+	defer pr.Close()
 
 	go func() {
 		_, err := Download(ctx, link, pw)
@@ -75,6 +76,7 @@ func DownloadAndUnzip(ctx context.Context, link string, writer io.Writer) error 
 
 func DownloadAndUntarArchive(ctx context.Context, link string, dst string) error {
 	pr, pw := io.Pipe()
+	defer pr.Close()
 
 	go func() {
 		_, err := Download(ctx, link, pw)
@@ -83,30 +85,8 @@ func DownloadAndUntarArchive(ctx context.Context, link string, dst string) error
 	return UntarArchive(dst, pr)
 }
 
-const squidProxy = "http://squid.corp.redhat.com:3128"
-
-var stagingProxySuffixes = []string{
-	".qa.redhat.com",
-	".dev.redhat.com",
-	".stage.redhat.com",
-	".preprod.redhat.com",
-}
-
-func proxyForStagingOnly(req *http.Request) (*url.URL, error) {
-	host := req.URL.Hostname()
-	for _, suffix := range stagingProxySuffixes {
-		if strings.HasSuffix(host, suffix) {
-			return url.Parse(squidProxy)
-		}
-	}
-	return nil, nil
-}
-
 func Download(ctx context.Context, link string, writer io.Writer) (int64, error) {
-	client := &http.Client{
-		Timeout:   2 * time.Minute, //nolint:mnd
-		Transport: &http.Transport{Proxy: proxyForStagingOnly},
-	}
+	client := &http.Client{Timeout: 2 * time.Minute} //nolint:mnd
 
 	const maxRetries = 5
 	var lastErr error
@@ -136,8 +116,13 @@ func Download(ctx context.Context, link string, writer io.Writer) (int64, error)
 			lastErr = fmt.Errorf("bad status: %s", resp.Status)
 			continue
 		}
-		defer resp.Body.Close()
-		return io.Copy(writer, resp.Body)
+		n, copyErr := io.Copy(writer, resp.Body)
+		resp.Body.Close()
+		if copyErr != nil {
+			lastErr = copyErr
+			continue
+		}
+		return n, nil
 	}
 	return 0, fmt.Errorf("download failed after %d attempts: %w", maxRetries, lastErr)
 }
