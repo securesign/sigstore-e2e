@@ -1,0 +1,154 @@
+name: E2E
+
+on:
+  pull_request:
+    branches: ["main", "release*"]
+  push:
+    branches: ["main", "release*"]
+  workflow_dispatch:
+    inputs:
+      operator_image:
+        description: "Operator image (e.g. ghcr.io/securesign/secure-sign-operator:latest)"
+        required: false
+      operator_ref:
+        description: "secure-sign-operator branch/tag for CI infrastructure"
+        required: false
+        default: release-1.4
+
+env:
+  REGISTRY: ghcr.io
+  OPERATOR_REPO: securesign/secure-sign-operator
+  OPERATOR_REF: ${{ inputs.operator_ref || 'release-1.4' }}
+  TEST_NAMESPACE: test
+
+jobs:
+  e2e:
+    name: E2E tests
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout secure-sign-operator
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.OPERATOR_REPO }}
+          ref: ${{ env.OPERATOR_REF }}
+
+      - name: Checkout sigstore-e2e
+        uses: actions/checkout@v4
+        with:
+          path: e2e
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: e2e/go.mod
+
+      - name: Log in to GitHub Container Registry
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          auth_file_path: /tmp/config.json
+
+      - name: Log in to registry.redhat.io
+        uses: redhat-actions/podman-login@v1
+        with:
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+          registry: registry.redhat.io
+          auth_file_path: /tmp/config.json
+
+      - name: Install Kind cluster
+        id: kind
+        uses: ./.github/actions/kind-cluster
+        with:
+          config: ./ci/config.yaml
+          keycloak: "true"
+          olm: "true"
+          prometheus: "true"
+
+      - name: Build operator image
+        id: operator-image
+        run: |
+          if [ -n "${{ inputs.operator_image }}" ]; then
+            IMG="${{ inputs.operator_image }}"
+            podman pull "$IMG"
+          else
+            IMG="localhost/rhtas-operator:e2e"
+            make docker-build-skip-test IMG="$IMG" CONTAINER_TOOL=podman
+          fi
+          echo "img=$IMG" >> "$GITHUB_OUTPUT"
+
+      - name: Load operator image into Kind
+        run: |
+          podman save ${{ steps.operator-image.outputs.img }} -o operator-oci.tar
+          kind load image-archive operator-oci.tar
+
+      - name: Deploy operator
+        run: |
+          make dev-images generate && cat config/default/images.env
+          IMG=${{ steps.operator-image.outputs.img }} TARGET_PLATFORM=kubernetes make deploy
+
+      - name: Wait for operator
+        run: |
+          kubectl wait --for=condition=available deployment/rhtas-operator-controller-manager \
+            --timeout=120s -n openshift-rhtas-operator
+
+      - name: Add service hosts
+        run: |
+          echo "127.0.0.1 fulcio-server.local tuf.local rekor-server.local keycloak-internal.keycloak-system.svc rekor-search-ui.local cli-server.local tsa-server.local" \
+            | sudo tee -a /etc/hosts
+
+      - name: Install SecureSign
+        run: |
+          OIDC_HOST="${{ steps.kind.outputs.oidc_host }}"
+          sed -i "s#https://your-oidc-issuer-url#http://${OIDC_HOST}/realms/trusted-artifact-signer#" \
+            config/samples/rhtas_v1alpha1_securesign.yaml
+          kubectl create ns ${{ env.TEST_NAMESPACE }}
+          echo "Waiting for conversion webhook to be ready..."
+          for i in $(seq 1 60); do
+            kubectl create --dry-run=server -f config/samples/rhtas_v1alpha1_securesign.yaml 2>/dev/null && break
+            echo "Waiting for conversion webhook... ($i/60)"
+            sleep 5
+          done
+          kubectl create -f config/samples/rhtas_v1alpha1_securesign.yaml -n ${{ env.TEST_NAMESPACE }}
+          sleep 1
+          kubectl wait --for=condition=Ready securesign/securesign-sample \
+            --timeout=5m -n ${{ env.TEST_NAMESPACE }}
+
+      - name: Run E2E tests
+        working-directory: e2e
+        env:
+          OIDC_ISSUER_URL: "http://${{ steps.kind.outputs.oidc_host }}/realms/trusted-artifact-signer"
+          CLI_STRATEGY: cli_server
+          CLI_SERVER_URL: "http://cli-server.local"
+        run: |
+          REKOR_UI_URL=$(kubectl get rekor -o jsonpath='{.items[0].status.rekorSearchUIUrl}' -n ${{ env.TEST_NAMESPACE }})
+          export REKOR_UI_URL
+          TUF_URL=$(kubectl get tuf -o jsonpath='{.items[0].status.url}' -n ${{ env.TEST_NAMESPACE }})
+          export TUF_URL
+          REKOR_URL=$(kubectl get rekor -o jsonpath='{.items[0].status.url}' -n ${{ env.TEST_NAMESPACE }})
+          export REKOR_URL
+          FULCIO_URL=$(kubectl get fulcio -o jsonpath='{.items[0].status.url}' -n ${{ env.TEST_NAMESPACE }})
+          export FULCIO_URL
+
+          source ./tas-env-variables.sh
+
+          go run github.com/mxschmitt/playwright-go/cmd/playwright install --with-deps
+          go test -v ./test/...
+
+      - name: Dump operator logs
+        if: failure()
+        run: |
+          kubectl logs -n openshift-rhtas-operator deployment/rhtas-operator-controller-manager
+
+      - name: Archive test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results
+          path: e2e/test/**/k8s-dump-*.tar.gz
+          if-no-files-found: ignore

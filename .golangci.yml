@@ -1,4 +1,7 @@
 linters-settings:
+  gosec:
+    excludes:
+      - G115
   lll:
     line-length: 170
 linters:
@@ -8,6 +11,7 @@ linters:
     - deadcode
     - depguard
     - dupl
+    - errname
     - exhaustive
     - exhaustivestruct
     - exhaustruct
@@ -26,6 +30,7 @@ linters:
     - gomnd
     - gomoddirectives
     - ifshort
+    - intrange
     - interfacer
     - ireturn
     - lll
@@ -37,6 +42,7 @@ linters:
     - nolintlint
     - nosnakecase
     - paralleltest
+    - perfsprint
     - revive
     - rowserrcheck
     - scopelint
