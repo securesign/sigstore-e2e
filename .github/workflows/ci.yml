@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ["main", "release*"]
+  push:
+    branches: ["main", "release*"]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.8
+          args: --verbose --timeout=15m
+
+  unit-test:
+    name: Unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: go build ./...
+
+      - name: Run strategy tests
+        run: go test ./pkg/... -v -count=1
