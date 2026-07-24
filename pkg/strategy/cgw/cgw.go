@@ -38,7 +38,21 @@ func download(ctx context.Context, cgwURL string, cliName string) (string, error
 	}
 
 	if err = support.DownloadAndUntarArchive(ctx, link, tmp); err != nil {
-		return "", err
+		_ = os.RemoveAll(tmp)
+		logrus.Infof("Direct download failed, resolving CDN link for: %s", link)
+		cdnLink, cdnErr := support.ResolveCDNLink(ctx, link)
+		if cdnErr != nil {
+			return "", fmt.Errorf("download failed and CDN resolution failed: %w", cdnErr)
+		}
+		logrus.Infof("Resolved CDN link: %s", cdnLink)
+		tmp, err = os.MkdirTemp("", cliName)
+		if err != nil {
+			return "", err
+		}
+		if err = support.DownloadAndUntarArchive(ctx, cdnLink, tmp); err != nil {
+			_ = os.RemoveAll(tmp)
+			return "", err
+		}
 	}
 
 	return support.FindBinary(tmp, cliName, runtime.GOOS, runtime.GOARCH)
