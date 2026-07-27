@@ -5,7 +5,7 @@ linters:
   enable:
     - copyloopvar
     - errcheck
-    - goconst
+    # - goconst  # disabled: too many false positives on short strings like "version" and "testcli"
     - gocyclo
     - gosec
     - govet
