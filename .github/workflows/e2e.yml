@@ -20,6 +20,7 @@ env:
   OPERATOR_REPO: securesign/secure-sign-operator
   OPERATOR_REF: ${{ inputs.operator_ref || 'main' }}
   TEST_NAMESPACE: test
+  CLI_CGW_VERSION: "1.4.2"
 
 jobs:
   e2e:
@@ -99,7 +100,7 @@ jobs:
 
       - name: Add service hosts
         run: |
-          echo "127.0.0.1 fulcio-server.local tuf.local rekor-server.local keycloak-internal.keycloak-system.svc rekor-search-ui.local cli-server.local tsa-server.local" \
+          echo "127.0.0.1 fulcio-server.local tuf.local rekor-server.local keycloak-internal.keycloak-system.svc rekor-search-ui.local tsa-server.local" \
             | sudo tee -a /etc/hosts
 
       - name: Install SecureSign
@@ -123,8 +124,8 @@ jobs:
         working-directory: e2e
         env:
           OIDC_ISSUER_URL: "http://${{ steps.kind.outputs.oidc_host }}/realms/trusted-artifact-signer"
-          CLI_STRATEGY: cli_server
-          CLI_SERVER_URL: "http://cli-server.local"
+          CLI_STRATEGY: cgw
+          CGW_URL: "https://developers.redhat.com/content-gateway/file/RHTAS/${{ env.CLI_CGW_VERSION }}"
         run: |
           REKOR_UI_URL=$(kubectl get rekor -o jsonpath='{.items[0].status.rekorSearchUIUrl}' -n ${{ env.TEST_NAMESPACE }})
           export REKOR_UI_URL
