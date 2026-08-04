@@ -1,15 +1,8 @@
 package cosign
 
 import (
-	"encoding/base64"
-	"io"
-	"os"
 	"regexp"
 
-	"github.com/docker/docker/api/types/image"
-
-	"github.com/docker/docker/client"
-	"github.com/google/uuid"
 	"github.com/securesign/sigstore-e2e/pkg/api"
 	"github.com/securesign/sigstore-e2e/pkg/clients"
 	"github.com/securesign/sigstore-e2e/test/testsupport"
@@ -19,16 +12,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const tsaTestImage string = "mirror.gcr.io/alpine:latest"
-
 var tsaTargetImageName string
 
 var _ = Describe("TSA test", Ordered, func() {
 
 	var (
-		err       error
-		dockerCli *client.Client
-		cosign    *clients.Cosign
+		err    error
+		cosign *clients.Cosign
 	)
 
 	BeforeAll(func() {
@@ -50,24 +40,8 @@ var _ = Describe("TSA test", Ordered, func() {
 
 		manualImageSetup := api.GetValueFor(api.ManualImageSetup) == "true"
 		if !manualImageSetup {
-			tsaTargetImageName = "ttl.sh/" + uuid.New().String() + ":5m"
-			dockerCli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+			tsaTargetImageName, err = testsupport.PushTestImage(testsupport.TestContext)
 			Expect(err).ToNot(HaveOccurred())
-
-			var pull io.ReadCloser
-			pull, err = dockerCli.ImagePull(testsupport.TestContext, tsaTestImage, image.PullOptions{})
-			Expect(err).ToNot(HaveOccurred())
-			_, err = io.Copy(os.Stdout, pull)
-			Expect(err).ToNot(HaveOccurred())
-			defer pull.Close()
-
-			Expect(dockerCli.ImageTag(testsupport.TestContext, tsaTestImage, tsaTargetImageName)).To(Succeed())
-			var push io.ReadCloser
-			push, err = dockerCli.ImagePush(testsupport.TestContext, tsaTargetImageName, image.PushOptions{RegistryAuth: base64.StdEncoding.EncodeToString([]byte("{}"))})
-			Expect(err).ToNot(HaveOccurred())
-			_, err = io.Copy(os.Stdout, push)
-			Expect(err).ToNot(HaveOccurred())
-			defer push.Close()
 		} else {
 			tsaTargetImageName = api.GetValueFor(api.TargetImageName)
 			Expect(tsaTargetImageName).NotTo(BeEmpty(), "TARGET_IMAGE_NAME environment variable must be set when MANUAL_IMAGE_SETUP is true")
