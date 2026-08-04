@@ -14,7 +14,7 @@ import (
 
 const (
 	testImageRegistry = "quay.io/securesign/e2e-test"
-	baseTestImage     = "mirror.gcr.io/alpine:latest"
+	baseTestImage     = "registry.k8s.io/pause:3.9"
 )
 
 // PushTestImage pulls a base image, adds a quay.io auto-expiration label,
