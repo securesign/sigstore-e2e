@@ -13,12 +13,12 @@ import (
 )
 
 const (
-	testImageRegistry = "quay.io/securesign/e2e-test"
+	testImageRegistry = "quay.io/securesign/e2e-tests"
 	baseTestImage     = "registry.k8s.io/pause:3.9"
 )
 
 // PushTestImage pulls a base image, adds a quay.io auto-expiration label,
-// and pushes it to quay.io/securesign/e2e-test with a unique tag.
+// and pushes it to quay.io/securesign/e2e-tests with a unique tag.
 // Auth is resolved from the Docker config (~/.docker/config.json).
 func PushTestImage(ctx context.Context) (string, error) {
 	tag := uuid.New().String()
