@@ -44,6 +44,7 @@ func PushTestImage(ctx context.Context) (string, error) {
 		cfgCopy.Config.Labels = map[string]string{}
 	}
 	cfgCopy.Config.Labels["quay.expires-after"] = "1h"
+	cfgCopy.Config.Labels["run-id"] = tag
 
 	img, err = mutate.ConfigFile(img, &cfgCopy)
 	if err != nil {
@@ -60,6 +61,12 @@ func PushTestImage(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("pushing image: %w", err)
 	}
 
-	logrus.Infof("Pushed test image: %s", targetRef)
-	return targetRef, nil
+	digest, err := img.Digest()
+	if err != nil {
+		return "", fmt.Errorf("computing image digest: %w", err)
+	}
+
+	digestRef := testImageRegistry + "@" + digest.String()
+	logrus.Infof("Pushed test image: %s (digest: %s)", targetRef, digestRef)
+	return digestRef, nil
 }
