@@ -41,7 +41,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 
 	BeforeAll(func() {
 		logrus.Infof("Starting cosign test")
-		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm)
+		err = testsupport.CheckMandatoryAPIConfigValues(api.OidcRealm, api.RekorURL)
 		if err != nil {
 			Fail(err.Error())
 		}
@@ -86,7 +86,8 @@ var _ = Describe("Cosign test", Ordered, func() {
 			token, err := testsupport.GetOIDCToken(testsupport.TestContext)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(cosign.Command(testsupport.TestContext, "sign", "--identity-token="+token, targetImageName).Run()).To(Succeed())
+			rekorServerURL := api.GetValueFor(api.RekorURL)
+			Expect(cosign.Command(testsupport.TestContext, "sign", "--identity-token="+token, "--rekor-url="+rekorServerURL, targetImageName).Run()).To(Succeed())
 
 			// Extract logIndex by downloading signature bundles from the registry.
 			// Multiple bundles may exist if the image was signed more than once;
@@ -173,9 +174,14 @@ var _ = Describe("Cosign test", Ordered, func() {
 		It("should retrieve the entry from Rekor and create public-key and signature files", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
 			logIndexStr := strconv.Itoa(logIndex)
+			logrus.Infof("querying rekor for log-index %s", logIndexStr)
 
-			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", logIndexStr)
-			Expect(err).ToNot(HaveOccurred())
+			var output []byte
+			Eventually(func() error {
+				var err error
+				output, err = rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", logIndexStr)
+				return err
+			}).WithTimeout(testsupport.CommandRetryTimeout).WithPolling(testsupport.CommandRetryInterval).Should(Succeed())
 
 			// Look for JSON start
 			startIndex := strings.Index(string(output), "{")
