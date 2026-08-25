@@ -2,6 +2,7 @@ package support
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"compress/gzip"
 	"context"
 	"encoding/base64"
@@ -83,6 +84,28 @@ func DownloadAndUntarArchive(ctx context.Context, link string, dst string) error
 		pw.CloseWithError(err)
 	}()
 	return UntarArchive(dst, pr)
+}
+
+// DownloadAndUnzipArchive downloads a .zip archive and extracts its contents into dst.
+// Unlike tar.gz, zip requires random access, so the archive is first written to a
+// temporary file before being extracted.
+func DownloadAndUnzipArchive(ctx context.Context, link string, dst string) error {
+	tmp, err := os.CreateTemp("", "download-*.zip")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath) //nolint:errcheck
+
+	if _, err = Download(ctx, link, tmp); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err = tmp.Close(); err != nil {
+		return err
+	}
+
+	return UnzipArchive(dst, tmpPath)
 }
 
 func Download(ctx context.Context, link string, writer io.Writer) (int64, error) {
@@ -249,4 +272,57 @@ func UntarArchive(dst string, r io.Reader) error {
 			f.Close()
 		}
 	}
+}
+
+func UnzipArchive(dst string, archivePath string) error {
+	r, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return err
+	}
+	defer r.Close() //nolint:errcheck
+
+	for _, f := range r.File {
+		clean := filepath.Clean(f.Name)
+		if filepath.IsAbs(clean) || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) || clean == ".." {
+			return fmt.Errorf("zip entry %q contains path traversal", f.Name)
+		}
+		target := filepath.Join(dst, clean) // #nosec G305
+
+		if f.FileInfo().IsDir() {
+			if err := os.MkdirAll(target, 0755); err != nil { //nolint:mnd
+				return err
+			}
+			continue
+		}
+
+		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil { //nolint:mnd
+			return err
+		}
+
+		if err := extractZipFile(f, target); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func extractZipFile(f *zip.File, target string) error {
+	rc, err := f.Open()
+	if err != nil {
+		return err
+	}
+	defer rc.Close() //nolint:errcheck
+
+	// CLI binaries need to be executable regardless of the permissions
+	// stored in the archive (Windows zip entries typically carry none).
+	out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755) //nolint:mnd,gosec
+	if err != nil {
+		return err
+	}
+	defer out.Close() //nolint:errcheck
+
+	if _, err := io.Copy(out, rc); err != nil { // #nosec G110 - PROD CLIs are not decompression bomb
+		return fmt.Errorf("failed to extract %q: %w", f.Name, err)
+	}
+	return nil
 }

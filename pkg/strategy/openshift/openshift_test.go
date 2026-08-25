@@ -98,6 +98,43 @@ func TestStrategyContentGateway(t *testing.T) {
 	t.Logf("OK: testcli -> %s", path)
 }
 
+func TestStrategyContentGatewayZip(t *testing.T) {
+	binaryContent := []byte("#!/bin/sh\necho testcli\n")
+	zipArchive := testutil.BuildZip(t, map[string][]byte{"testcli": binaryContent})
+	expectedPath := "/RHTAS/1.4.1/testcli_" + runtime.GOOS + "_" + runtime.GOARCH + ".zip"
+
+	srv := testutil.ServeBinary(t, expectedPath, zipArchive)
+
+	cliDownload := consoleV1.ConsoleCLIDownload{
+		ObjectMeta: metav1.ObjectMeta{Name: "testcli"},
+		Spec: consoleV1.ConsoleCLIDownloadSpec{
+			DisplayName: "testcli - Command Line Interface (CLI)",
+			Description: "test binary",
+			Links: []consoleV1.CLIDownloadLink{
+				{Text: "Download testcli for Linux x86_64", Href: srv.URL + "/RHTAS/1.4.1/testcli_linux_amd64.zip"},
+				{Text: "Download testcli for Linux arm64", Href: srv.URL + "/RHTAS/1.4.1/testcli_linux_arm64.zip"},
+				{Text: "Download testcli for Mac x86_64", Href: srv.URL + "/RHTAS/1.4.1/testcli_darwin_amd64.zip"},
+				{Text: "Download testcli for Mac arm64", Href: srv.URL + "/RHTAS/1.4.1/testcli_darwin_arm64.zip"},
+				{Text: "Download testcli for Windows x86_64", Href: srv.URL + "/RHTAS/1.4.1/testcli_windows_amd64.zip"},
+			},
+		},
+	}
+
+	fakeClient := newFakeClient(t, cliDownload).Build()
+
+	// This mirrors the real-world Windows content-gateway link, which is always
+	// a .zip rather than a .tar.gz. Previously this fell through to
+	// strategy.DownloadFromLink, which neither understands .zip nor retries
+	// against the CDN fallback on failure.
+	path, err := download(t.Context(), fakeClient, "testcli")
+	if err != nil {
+		t.Fatalf("download failed: %v", err)
+	}
+
+	testutil.VerifyBinary(t, path, binaryContent)
+	t.Logf("OK: testcli -> %s", path)
+}
+
 func TestStrategyContentGatewayNameOverride(t *testing.T) {
 	binaryContent := []byte("#!/bin/sh\necho gitsign\n")
 	binaryName := "gitsign_cli_" + runtime.GOOS + "_" + runtime.GOARCH
