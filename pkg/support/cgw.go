@@ -21,6 +21,9 @@ func ContentGatewayName(name string) string {
 }
 
 // FindBinary searches for a CLI binary in the given directory using candidate name patterns.
+// The returned path is always named cliName (with a .exe suffix on Windows), created as a
+// symlink to the matched candidate when needed, so that callers can rely on a predictable,
+// executable path regardless of the archive's internal naming.
 func FindBinary(dir, cliName, goos, goarch string) (string, error) {
 	cgwName := ContentGatewayName(cliName)
 	candidates := []string{cliName}
@@ -32,7 +35,10 @@ func FindBinary(dir, cliName, goos, goarch string) (string, error) {
 		fmt.Sprintf("%s_%s", cgwName, goos),
 		fmt.Sprintf("%s-%s-%s", cliName, goos, goarch),
 	)
+
+	linkName := cliName
 	if goos == "windows" {
+		linkName += ".exe"
 		for i, name := range candidates {
 			candidates[i] = name + ".exe"
 		}
@@ -41,8 +47,8 @@ func FindBinary(dir, cliName, goos, goarch string) (string, error) {
 	for _, name := range candidates {
 		path := filepath.Join(dir, name)
 		if _, err := os.Stat(path); err == nil {
-			if name != cliName {
-				link := filepath.Join(dir, cliName)
+			if name != linkName {
+				link := filepath.Join(dir, linkName)
 				if err := os.Symlink(path, link); err == nil {
 					return link, nil
 				}
