@@ -31,6 +31,10 @@ const (
 
 var versionRegexp = regexp.MustCompile(`/RHTAS/[^/]+/`)
 
+// extractFunc downloads and extracts an archive at link, returning the path to
+// the extracted binary named cliName.
+type extractFunc func(ctx context.Context, cliName string, link string) (string, error)
+
 func download(ctx context.Context, client controller.Reader, cliName string) (string, error) {
 	logrus.Info("Getting binary '", cliName, "' from Openshift")
 	link, err := kubernetes.ConsoleCLIDownload(ctx, client, cliName, runtime.GOOS, runtime.GOARCH)
@@ -38,21 +42,34 @@ func download(ctx context.Context, client controller.Reader, cliName string) (st
 		return "", err
 	}
 
-	if isTarGz(link) {
-		path, err := downloadTarGz(ctx, cliName, link)
-		if err != nil && strings.Contains(link, prodHost) {
-			fallbackLink := versionRegexp.ReplaceAllString(link, "/RHTAS/"+fallbackVersion+"/")
-			logrus.Infof("Download failed, falling back to stable %s via CDN: %s", fallbackVersion, fallbackLink)
-			cdnLink, cdnErr := support.ResolveCDNLink(ctx, fallbackLink)
-			if cdnErr != nil {
-				return "", fmt.Errorf("all download attempts failed (current version, CDN fallback %s): %w", fallbackVersion, cdnErr)
-			}
-			logrus.Infof("Resolved CDN link: %s", cdnLink)
-			return downloadTarGz(ctx, cliName, cdnLink)
-		}
+	switch {
+	case isTarGz(link):
+		return downloadWithFallback(ctx, cliName, link, downloadTarGz)
+	case isZip(link):
+		return downloadWithFallback(ctx, cliName, link, downloadZip)
+	default:
+		return strategy.DownloadFromLink(ctx, cliName, link)
+	}
+}
+
+// downloadWithFallback extracts the archive at link using extract. If that fails and
+// link points at the production content gateway, it retries against the last known
+// stable release resolved via the CDN, using the same extraction logic (and therefore
+// the same archive format) as the original link.
+func downloadWithFallback(ctx context.Context, cliName string, link string, extract extractFunc) (string, error) {
+	path, err := extract(ctx, cliName, link)
+	if err == nil || !strings.Contains(link, prodHost) {
 		return path, err
 	}
-	return strategy.DownloadFromLink(ctx, cliName, link)
+
+	fallbackLink := versionRegexp.ReplaceAllString(link, "/RHTAS/"+fallbackVersion+"/")
+	logrus.Infof("Download failed, falling back to stable %s via CDN: %s", fallbackVersion, fallbackLink)
+	cdnLink, cdnErr := support.ResolveCDNLink(ctx, fallbackLink)
+	if cdnErr != nil {
+		return "", fmt.Errorf("all download attempts failed (current version, CDN fallback %s): %w", fallbackVersion, cdnErr)
+	}
+	logrus.Infof("Resolved CDN link: %s", cdnLink)
+	return extract(ctx, cliName, cdnLink)
 }
 
 func isTarGz(link string) bool {
@@ -61,6 +78,14 @@ func isTarGz(link string) bool {
 		return strings.HasSuffix(link, ".tar.gz")
 	}
 	return strings.HasSuffix(u.Path, ".tar.gz")
+}
+
+func isZip(link string) bool {
+	u, err := url.Parse(link)
+	if err != nil {
+		return strings.HasSuffix(link, ".zip")
+	}
+	return strings.HasSuffix(u.Path, ".zip")
 }
 
 func downloadTarGz(ctx context.Context, cliName string, link string) (string, error) {
@@ -72,6 +97,22 @@ func downloadTarGz(ctx context.Context, cliName string, link string) (string, er
 	}
 
 	if err = support.DownloadAndUntarArchive(ctx, link, tmp); err != nil {
+		_ = os.RemoveAll(tmp)
+		return "", err
+	}
+
+	return support.FindBinary(tmp, cliName, runtime.GOOS, runtime.GOARCH)
+}
+
+func downloadZip(ctx context.Context, cliName string, link string) (string, error) {
+	logrus.Info("Downloading ", cliName, " from ", link)
+
+	tmp, err := os.MkdirTemp("", cliName)
+	if err != nil {
+		return "", err
+	}
+
+	if err = support.DownloadAndUnzipArchive(ctx, link, tmp); err != nil {
 		_ = os.RemoveAll(tmp)
 		return "", err
 	}

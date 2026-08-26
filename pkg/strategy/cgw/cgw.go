@@ -25,9 +25,22 @@ func init() {
 	})
 }
 
+// extractArchive downloads and extracts the archive at link into dst. Windows binaries
+// are distributed as .zip on the content gateway, everything else as .tar.gz.
+func extractArchive(ctx context.Context, link string, dst string) error {
+	if runtime.GOOS == "windows" {
+		return support.DownloadAndUnzipArchive(ctx, link, dst)
+	}
+	return support.DownloadAndUntarArchive(ctx, link, dst)
+}
+
 func download(ctx context.Context, cgwURL string, cliName string) (string, error) {
 	cgwName := support.ContentGatewayName(cliName)
-	archiveName := fmt.Sprintf("%s_%s_%s.tar.gz", cgwName, runtime.GOOS, runtime.GOARCH)
+	ext := "tar.gz"
+	if runtime.GOOS == "windows" {
+		ext = "zip"
+	}
+	archiveName := fmt.Sprintf("%s_%s_%s.%s", cgwName, runtime.GOOS, runtime.GOARCH, ext)
 	link := fmt.Sprintf("%s/%s", strings.TrimRight(cgwURL, "/"), archiveName)
 
 	logrus.Info("Getting binary '", cliName, "' from content gateway: ", link)
@@ -37,7 +50,7 @@ func download(ctx context.Context, cgwURL string, cliName string) (string, error
 		return "", err
 	}
 
-	if err = support.DownloadAndUntarArchive(ctx, link, tmp); err != nil {
+	if err = extractArchive(ctx, link, tmp); err != nil {
 		_ = os.RemoveAll(tmp)
 		logrus.Infof("Direct download failed, resolving CDN link for: %s", link)
 		cdnLink, cdnErr := support.ResolveCDNLink(ctx, link)
@@ -49,7 +62,7 @@ func download(ctx context.Context, cgwURL string, cliName string) (string, error
 		if err != nil {
 			return "", err
 		}
-		if err = support.DownloadAndUntarArchive(ctx, cdnLink, tmp); err != nil {
+		if err = extractArchive(ctx, cdnLink, tmp); err != nil {
 			_ = os.RemoveAll(tmp)
 			return "", err
 		}
