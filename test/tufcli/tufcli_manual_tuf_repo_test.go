@@ -1,4 +1,4 @@
-package tuftool
+package tufcli
 
 import (
 	"fmt"
@@ -34,20 +34,20 @@ const expirationDays10 string = "in 10 days"
 var _ = Describe("TUF manual repo test", Ordered, func() {
 
 	var (
-		err     error
-		tuftool *clients.Tuftool
+		err    error
+		tufcli *clients.Tufcli
 	)
 
 	BeforeAll(func() {
 
-		tuftool = clients.NewTuftool()
+		tufcli = clients.NewTufcli()
 
 		openshiftStrategyActive := api.GetValueFor(api.CliStrategy) == "openshift"
 		if openshiftStrategyActive && (runtime.GOOS != "linux" || runtime.GOARCH != "amd64") {
-			logrus.Info("Skipping tuftool download test: openshift strategy is only supported on linux/amd64")
-			Skip("Skipping tuftool download test: openshift strategy is only supported on linux/amd64")
+			logrus.Info("Skipping tufcli download test: openshift strategy is only supported on linux/amd64")
+			Skip("Skipping tufcli download test: openshift strategy is only supported on linux/amd64")
 		}
-		Expect(testsupport.InstallPrerequisites(tuftool)).To(Succeed())
+		Expect(testsupport.InstallPrerequisites(tufcli)).To(Succeed())
 
 		DeferCleanup(func() {
 			if err := testsupport.DestroyPrerequisites(); err != nil {
@@ -61,8 +61,8 @@ var _ = Describe("TUF manual repo test", Ordered, func() {
 		logrus.Infof("Created temporary directory: %s", workdir)
 	})
 
-	It("should setup repository via tuftool", func() {
-		setupManualTufRepo(tuftool)
+	It("should setup repository via tufcli", func() {
+		setupManualTufRepo(tufcli)
 	})
 
 	It("should verify workdir structure", func() {
@@ -70,8 +70,7 @@ var _ = Describe("TUF manual repo test", Ordered, func() {
 	})
 })
 
-func setupManualTufRepo(tuftool *clients.Tuftool) {
-	// "Tuf repo directory"
+func setupManualTufRepo(tufcli *clients.Tufcli) {
 	root = filepath.Join(workdir, "root", "root.json")
 	rootDir = filepath.Join(workdir, "root")
 	input = filepath.Join(workdir, "input")
@@ -87,22 +86,22 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 	err = os.MkdirAll(tufRepo, os.ModePerm)
 	Expect(err).ToNot(HaveOccurred())
 
-	Expect(tuftool.Command(testsupport.TestContext, "root", "init", root).Run()).To(Succeed())
-	Expect(tuftool.Command(testsupport.TestContext, "root", "expire", root, expirationWeeks52).Run()).To(Succeed())
+	Expect(tufcli.Command(testsupport.TestContext, "root", "init", "--path", root).Run()).To(Succeed())
+	Expect(tufcli.Command(testsupport.TestContext, "root", "expire", "--path", root, "--time", expirationWeeks52).Run()).To(Succeed())
 
-	Expect(tuftool.Command(testsupport.TestContext, "root", "set-threshold", root, "root", "1").Run()).To(Succeed())
-	Expect(tuftool.Command(testsupport.TestContext, "root", "set-threshold", root, "snapshot", "1").Run()).To(Succeed())
-	Expect(tuftool.Command(testsupport.TestContext, "root", "set-threshold", root, "targets", "1").Run()).To(Succeed())
-	Expect(tuftool.Command(testsupport.TestContext, "root", "set-threshold", root, "timestamp", "1").Run()).To(Succeed())
+	Expect(tufcli.Command(testsupport.TestContext, "root", "set-threshold", "--path", root, "--role", "root", "--threshold", "1").Run()).To(Succeed())
+	Expect(tufcli.Command(testsupport.TestContext, "root", "set-threshold", "--path", root, "--role", "snapshot", "--threshold", "1").Run()).To(Succeed())
+	Expect(tufcli.Command(testsupport.TestContext, "root", "set-threshold", "--path", root, "--role", "targets", "--threshold", "1").Run()).To(Succeed())
+	Expect(tufcli.Command(testsupport.TestContext, "root", "set-threshold", "--path", root, "--role", "timestamp", "--threshold", "1").Run()).To(Succeed())
 
-	Expect(tuftool.Command(testsupport.TestContext, "root", "gen-rsa-key", root, keyDir+"/root.pem", "--role", "root").Run()).To(Succeed())
-	Expect(tuftool.Command(testsupport.TestContext, "root", "gen-rsa-key", root, keyDir+"/snapshot.pem", "--role", "snapshot").Run()).To(Succeed())
-	Expect(tuftool.Command(testsupport.TestContext, "root", "gen-rsa-key", root, keyDir+"/targets.pem", "--role", "targets").Run()).To(Succeed())
-	Expect(tuftool.Command(testsupport.TestContext, "root", "gen-rsa-key", root, keyDir+"/timestamp.pem", "--role", "timestamp").Run()).To(Succeed())
+	Expect(tufcli.Command(testsupport.TestContext, "root", "gen-rsa-key", "--path", root, "--output", keyDir+"/root.pem", "--role", "root").Run()).To(Succeed())
+	Expect(tufcli.Command(testsupport.TestContext, "root", "gen-rsa-key", "--path", root, "--output", keyDir+"/snapshot.pem", "--role", "snapshot").Run()).To(Succeed())
+	Expect(tufcli.Command(testsupport.TestContext, "root", "gen-rsa-key", "--path", root, "--output", keyDir+"/targets.pem", "--role", "targets").Run()).To(Succeed())
+	Expect(tufcli.Command(testsupport.TestContext, "root", "gen-rsa-key", "--path", root, "--output", keyDir+"/timestamp.pem", "--role", "timestamp").Run()).To(Succeed())
 
-	Expect(tuftool.Command(testsupport.TestContext, "root", "sign", root, "-k", keyDir+"/root.pem").Run()).To(Succeed())
+	Expect(tufcli.Command(testsupport.TestContext, "root", "sign", "--path", root, "--key", keyDir+"/root.pem").Run()).To(Succeed())
 
-	Expect(tuftool.Command(testsupport.TestContext, "create",
+	Expect(tufcli.Command(testsupport.TestContext, "create",
 		"--root", root,
 		"--key", keyDir+"/root.pem",
 		"--key", keyDir+"/snapshot.pem",
@@ -117,7 +116,7 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 		"--timestamp-version", "1",
 		"--outdir", tufRepo).Run()).To(Succeed())
 
-	Expect(tuftool.Command(testsupport.TestContext, "rhtas",
+	Expect(tufcli.Command(testsupport.TestContext, "rhtas",
 		"--root", root,
 		"--key", keyDir+"/root.pem",
 		"--key", keyDir+"/snapshot.pem",
@@ -135,7 +134,7 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 		"--outdir", tufRepo,
 		"--metadata-url", "file://"+tufRepo).Run()).To(Succeed())
 
-	Expect(tuftool.Command(testsupport.TestContext, "rhtas",
+	Expect(tufcli.Command(testsupport.TestContext, "rhtas",
 		"--root", root,
 		"--key", keyDir+"/root.pem",
 		"--key", keyDir+"/snapshot.pem",
@@ -153,7 +152,7 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 		"--outdir", tufRepo,
 		"--metadata-url", "file://"+tufRepo).Run()).To(Succeed())
 
-	Expect(tuftool.Command(testsupport.TestContext, "rhtas",
+	Expect(tufcli.Command(testsupport.TestContext, "rhtas",
 		"--root", root,
 		"--key", keyDir+"/root.pem",
 		"--key", keyDir+"/snapshot.pem",
@@ -171,7 +170,7 @@ func setupManualTufRepo(tuftool *clients.Tuftool) {
 		"--outdir", tufRepo,
 		"--metadata-url", "file://"+tufRepo).Run()).To(Succeed())
 
-	Expect(tuftool.Command(testsupport.TestContext, "rhtas",
+	Expect(tufcli.Command(testsupport.TestContext, "rhtas",
 		"--root", root,
 		"--key", keyDir+"/root.pem",
 		"--key", keyDir+"/snapshot.pem",
@@ -223,7 +222,7 @@ func verifyWorkdirStructure(rootPath string) {
 
 	foundSuffixesCount := make(map[string]int)
 	for _, suffix := range targetSuffixes {
-		foundSuffixesCount[suffix] = 0 // Initialize count for each suffix
+		foundSuffixesCount[suffix] = 0
 	}
 
 	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {

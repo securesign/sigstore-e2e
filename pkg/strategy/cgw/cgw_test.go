@@ -21,7 +21,7 @@ func TestContentGatewayName(t *testing.T) {
 		{"gitsign", "gitsign_cli"},
 		{"rekor-cli", "rekor_cli"},
 		{"ec", "ec"},
-		{"tuftool", "tuftool"},
+		{"tufcli", "tufcli"},
 		{"createtree", "createtree"},
 		{"some-other-tool", "some_other_tool"},
 	}

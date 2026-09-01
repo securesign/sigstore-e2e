@@ -36,6 +36,9 @@ const (
 	GitBranch      = "GIT_BRANCH"
 	GitBuildDir    = "GIT_BUILD_DIR"
 
+	GoInstallModule  = "GOINSTALL_MODULE"
+	GoInstallVersion = "GOINSTALL_VERSION"
+
 	// 'DockerRegistry*' - Login credentials for 'registry.redhat.io'.
 	DockerRegistryUsername = "REGISTRY_USERNAME"
 	DockerRegistryPassword = "REGISTRY_PASSWORD"
