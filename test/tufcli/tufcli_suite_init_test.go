@@ -1,4 +1,4 @@
-package tuftool
+package tufcli
 
 import (
 	"testing"

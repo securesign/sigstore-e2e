@@ -7,6 +7,7 @@ import (
 	_ "github.com/securesign/sigstore-e2e/pkg/strategy/cliserver"
 	_ "github.com/securesign/sigstore-e2e/pkg/strategy/container"
 	_ "github.com/securesign/sigstore-e2e/pkg/strategy/git"
+	_ "github.com/securesign/sigstore-e2e/pkg/strategy/goinstall"
 	_ "github.com/securesign/sigstore-e2e/pkg/strategy/local"
 	_ "github.com/securesign/sigstore-e2e/pkg/strategy/openshift"
 )
