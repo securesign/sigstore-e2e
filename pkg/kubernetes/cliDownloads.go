@@ -11,10 +11,12 @@ import (
 
 func ConsoleCLIDownload(ctx context.Context, c controller.Reader, cli string, os string, arch string) (string, error) {
 	cld := &consoleV1.ConsoleCLIDownload{}
-	ok := controller.ObjectKey{
-		Name: cli,
+
+	// Try rhtas-prefixed name first (v1.5.0+), fall back to legacy name (v1.4.x).
+	err := c.Get(ctx, controller.ObjectKey{Name: "rhtas-" + cli}, cld)
+	if err != nil {
+		err = c.Get(ctx, controller.ObjectKey{Name: cli}, cld)
 	}
-	err := c.Get(ctx, ok, cld)
 	if err != nil {
 		return "", err
 	}
