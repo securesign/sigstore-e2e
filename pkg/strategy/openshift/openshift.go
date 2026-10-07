@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"regexp"
 	"runtime"
 	"strings"
 
@@ -24,13 +23,6 @@ func init() {
 	})
 }
 
-const (
-	prodHost        = "developers.redhat.com"
-	fallbackVersion = "1.4.2"
-)
-
-var versionRegexp = regexp.MustCompile(`/RHTAS/[^/]+/`)
-
 // extractFunc downloads and extracts an archive at link, returning the path to
 // the extracted binary named cliName.
 type extractFunc func(ctx context.Context, cliName string, link string) (string, error)
@@ -44,32 +36,34 @@ func download(ctx context.Context, client controller.Reader, cliName string) (st
 
 	switch {
 	case isTarGz(link):
-		return downloadWithFallback(ctx, cliName, link, downloadTarGz)
+		return downloadArchive(ctx, cliName, link, downloadTarGz)
 	case isZip(link):
-		return downloadWithFallback(ctx, cliName, link, downloadZip)
+		return downloadArchive(ctx, cliName, link, downloadZip)
 	default:
 		return strategy.DownloadFromLink(ctx, cliName, link)
 	}
 }
 
-// downloadWithFallback extracts the archive at link using extract. If that fails and
-// link points at the production content gateway, it retries against the last known
-// stable release resolved via the CDN, using the same extraction logic (and therefore
-// the same archive format) as the original link.
-func downloadWithFallback(ctx context.Context, cliName string, link string, extract extractFunc) (string, error) {
-	path, err := extract(ctx, cliName, link)
-	if err == nil || !strings.Contains(link, prodHost) {
-		return path, err
+// downloadArchive extracts the archive at link using extract.
+//
+// A content gateway file URL never serves the archive itself: it redirects to an
+// HTML interstitial page that carries the real CDN location in its tcDownloadURL
+// query parameter. Dereferencing the file URL with a redirect-following client
+// therefore yields HTML, which every extractor rejects. Resolve the CDN link
+// first so that the release under test is what actually gets downloaded.
+//
+// Links that do not point at the content gateway (cli-server, test servers) are
+// downloaded as-is.
+func downloadArchive(ctx context.Context, cliName string, link string, extract extractFunc) (string, error) {
+	if support.IsContentGatewayLink(link) {
+		cdnLink, err := support.ResolveCDNLink(ctx, link)
+		if err != nil {
+			return "", fmt.Errorf("resolving content gateway link %s: %w", link, err)
+		}
+		logrus.Infof("Resolved CDN link: %s", cdnLink)
+		link = cdnLink
 	}
-
-	fallbackLink := versionRegexp.ReplaceAllString(link, "/RHTAS/"+fallbackVersion+"/")
-	logrus.Infof("Download failed, falling back to stable %s via CDN: %s", fallbackVersion, fallbackLink)
-	cdnLink, cdnErr := support.ResolveCDNLink(ctx, fallbackLink)
-	if cdnErr != nil {
-		return "", fmt.Errorf("all download attempts failed (current version, CDN fallback %s): %w", fallbackVersion, cdnErr)
-	}
-	logrus.Infof("Resolved CDN link: %s", cdnLink)
-	return extract(ctx, cliName, cdnLink)
+	return extract(ctx, cliName, link)
 }
 
 func isTarGz(link string) bool {

@@ -150,6 +150,22 @@ func Download(ctx context.Context, link string, writer io.Writer) (int64, error)
 	return 0, fmt.Errorf("download failed after %d attempts: %w", maxRetries, lastErr)
 }
 
+// contentGatewayPath is the path prefix Red Hat's content gateway serves file
+// downloads under.
+const contentGatewayPath = "/content-gateway/"
+
+// IsContentGatewayLink reports whether link addresses the Red Hat content
+// gateway. Such a link never serves the archive itself: it redirects to an HTML
+// interstitial page that carries the real location in a tcDownloadURL query
+// parameter, so it must be passed through ResolveCDNLink before downloading.
+func IsContentGatewayLink(link string) bool {
+	u, err := url.Parse(link)
+	if err != nil {
+		return strings.Contains(link, contentGatewayPath)
+	}
+	return strings.Contains(u.Path, contentGatewayPath)
+}
+
 func ResolveCDNLink(ctx context.Context, link string) (string, error) {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
