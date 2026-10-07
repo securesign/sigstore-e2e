@@ -45,6 +45,18 @@ func download(ctx context.Context, cgwURL string, cliName string) (string, error
 
 	logrus.Info("Getting binary '", cliName, "' from content gateway: ", link)
 
+	// A content gateway file URL redirects to an HTML interstitial rather than
+	// serving the archive; the real location lives in its tcDownloadURL query
+	// parameter. Resolve it up front instead of extracting HTML and failing.
+	if support.IsContentGatewayLink(link) {
+		cdnLink, cdnErr := support.ResolveCDNLink(ctx, link)
+		if cdnErr != nil {
+			return "", fmt.Errorf("resolving content gateway link %s: %w", link, cdnErr)
+		}
+		logrus.Infof("Resolved CDN link: %s", cdnLink)
+		link = cdnLink
+	}
+
 	tmp, err := os.MkdirTemp("", cliName)
 	if err != nil {
 		return "", err
@@ -52,20 +64,7 @@ func download(ctx context.Context, cgwURL string, cliName string) (string, error
 
 	if err = extractArchive(ctx, link, tmp); err != nil {
 		_ = os.RemoveAll(tmp)
-		logrus.Infof("Direct download failed, resolving CDN link for: %s", link)
-		cdnLink, cdnErr := support.ResolveCDNLink(ctx, link)
-		if cdnErr != nil {
-			return "", fmt.Errorf("download failed and CDN resolution failed: %w", cdnErr)
-		}
-		logrus.Infof("Resolved CDN link: %s", cdnLink)
-		tmp, err = os.MkdirTemp("", cliName)
-		if err != nil {
-			return "", err
-		}
-		if err = extractArchive(ctx, cdnLink, tmp); err != nil {
-			_ = os.RemoveAll(tmp)
-			return "", err
-		}
+		return "", err
 	}
 
 	return support.FindBinary(tmp, cliName, runtime.GOOS, runtime.GOARCH)

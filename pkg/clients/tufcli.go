@@ -1,37 +1,19 @@
 package clients
 
-import (
-	"context"
-
-	"github.com/securesign/sigstore-e2e/pkg/strategy/goinstall"
-	"github.com/sirupsen/logrus"
-)
-
 type Tufcli struct {
 	*cli
 }
 
-// NewTufcli tries the preferred strategy (e.g. CGW) first; falls back to
-// go install until tufcli is available as a binary in TAS 1.5.
+// NewTufcli resolves tufcli through the configured strategy, like every other
+// CLI. It deliberately has no private fallback: a silent fallback hides the
+// case where the release under test does not publish a usable binary, which is
+// exactly what the e2e suite exists to catch. Use CLI_STRATEGY=goinstall to
+// build from source on purpose.
 func NewTufcli() *Tufcli {
 	return &Tufcli{
 		&cli{
-			Name: "tufcli",
-			setupStrategy: withFallback(
-				PreferredSetupStrategy(),
-				goinstall.ForModule("github.com/securesign/tufcli", "latest"),
-			),
+			Name:           "tufcli",
+			setupStrategy:  PreferredSetupStrategy(),
 			versionCommand: "--version",
 		}}
-}
-
-func withFallback(primary, fallback SetupStrategy) SetupStrategy {
-	return func(ctx context.Context, cliName string) (string, error) {
-		path, err := primary(ctx, cliName)
-		if err == nil {
-			return path, nil
-		}
-		logrus.Warnf("Primary strategy failed for %s: %v; falling back to go install", cliName, err)
-		return fallback(ctx, cliName)
-	}
 }

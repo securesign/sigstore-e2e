@@ -158,8 +158,19 @@ var _ = Describe("Verify entries, query the transparency log for inclusion proof
 			err = json.Unmarshal([]byte(jsonStr), &rekorGetOutput)
 			Expect(err).ToNot(HaveOccurred())
 
+			// rekor-cli changed its default upload type from rekord to
+			// hashedrekord (sigstore/rekor#2885), so the entry comes back under
+			// either key depending on the client that created it.
+			alg := rekorGetOutput.RekordObj.Data.Hash.Algorithm
+			value := rekorGetOutput.RekordObj.Data.Hash.Value
+			if value == "" {
+				alg = rekorGetOutput.HashedRekordObj.Data.Hash.Algorithm
+				value = rekorGetOutput.HashedRekordObj.Data.Hash.Value
+			}
+			Expect(value).ToNot(BeEmpty(), "no hash in rekor-cli get output (neither RekordObj nor HashedRekordObj)")
+
 			// algorithm:hashValue
-			hashWithAlg = rekorGetOutput.RekordObj.Data.Hash.Algorithm + ":" + rekorGetOutput.RekordObj.Data.Hash.Value
+			hashWithAlg = alg + ":" + value
 		})
 	})
 

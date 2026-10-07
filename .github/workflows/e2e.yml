@@ -20,7 +20,7 @@ env:
   OPERATOR_REPO: securesign/secure-sign-operator
   OPERATOR_REF: ${{ inputs.operator_ref || 'main' }}
   TEST_NAMESPACE: test
-  CLI_CGW_VERSION: "1.4.2"
+  CLI_CGW_VERSION: "1.5.0"
 
 jobs:
   e2e:
