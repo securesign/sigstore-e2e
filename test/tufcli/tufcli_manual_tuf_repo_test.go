@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
-	"github.com/securesign/sigstore-e2e/pkg/api"
 	"github.com/securesign/sigstore-e2e/pkg/clients"
 	"github.com/securesign/sigstore-e2e/test/testsupport"
 
@@ -42,11 +40,6 @@ var _ = Describe("TUF manual repo test", Ordered, func() {
 
 		tufcli = clients.NewTufcli()
 
-		openshiftStrategyActive := api.GetValueFor(api.CliStrategy) == "openshift"
-		if openshiftStrategyActive && (runtime.GOOS != "linux" || runtime.GOARCH != "amd64") {
-			logrus.Info("Skipping tufcli download test: openshift strategy is only supported on linux/amd64")
-			Skip("Skipping tufcli download test: openshift strategy is only supported on linux/amd64")
-		}
 		Expect(testsupport.InstallPrerequisites(tufcli)).To(Succeed())
 
 		DeferCleanup(func() {
