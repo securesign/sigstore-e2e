@@ -223,6 +223,9 @@ func verifyWorkdirStructure(rootPath string) {
 
 		relPath, err := filepath.Rel(rootPath, path)
 		Expect(err).ToNot(HaveOccurred())
+		// the expected paths below are written with forward slashes, so normalise
+		// the separator to keep the comparisons working on Windows
+		relPath = filepath.ToSlash(relPath)
 
 		// skip root directory
 		if relPath == "." {
