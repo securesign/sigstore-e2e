@@ -35,11 +35,13 @@ jobs:
         with:
           repository: ${{ env.OPERATOR_REPO }}
           ref: ${{ env.OPERATOR_REF }}
+          persist-credentials: false
 
       - name: Checkout sigstore-e2e
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           path: e2e
+          persist-credentials: false
 
       - name: Install Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
@@ -81,9 +83,16 @@ jobs:
 
       - name: Build operator image
         id: operator-image
+        env:
+          OPERATOR_IMAGE_INPUT: ${{ inputs.operator_image }}
         run: |
-          if [ -n "${{ inputs.operator_image }}" ]; then
-            IMG="${{ inputs.operator_image }}"
+          set -euo pipefail
+          if [[ -n "$OPERATOR_IMAGE_INPUT" ]]; then
+            if [[ ! "$OPERATOR_IMAGE_INPUT" =~ ^[A-Za-z0-9][A-Za-z0-9./_:@-]*$ ]]; then
+              echo "::error::operator_image contains invalid characters"
+              exit 1
+            fi
+            IMG="$OPERATOR_IMAGE_INPUT"
             podman pull "$IMG"
           else
             IMG="localhost/rhtas-operator:e2e"
@@ -92,14 +101,20 @@ jobs:
           echo "img=$IMG" >> "$GITHUB_OUTPUT"
 
       - name: Load operator image into Kind
+        env:
+          OPERATOR_IMAGE: ${{ steps.operator-image.outputs.img }}
         run: |
-          podman save ${{ steps.operator-image.outputs.img }} -o operator-oci.tar
+          set -euo pipefail
+          podman save "$OPERATOR_IMAGE" -o operator-oci.tar
           kind load image-archive operator-oci.tar
 
       - name: Deploy operator
+        env:
+          OPERATOR_IMAGE: ${{ steps.operator-image.outputs.img }}
         run: |
+          set -euo pipefail
           make dev-images generate && cat config/default/images.env
-          IMG=${{ steps.operator-image.outputs.img }} TARGET_PLATFORM=kubernetes make deploy
+          IMG="$OPERATOR_IMAGE" TARGET_PLATFORM=kubernetes make deploy
 
       - name: Wait for operator
         run: |
@@ -112,37 +127,41 @@ jobs:
             | sudo tee -a /etc/hosts
 
       - name: Install SecureSign
+        env:
+          OIDC_HOST: ${{ steps.kind.outputs.oidc_host }}
         run: |
-          OIDC_HOST="${{ steps.kind.outputs.oidc_host }}"
+          set -euo pipefail
           sed -i "s#https://your-oidc-issuer-url#http://${OIDC_HOST}/realms/trusted-artifact-signer#" \
             config/samples/rhtas_v1_securesign.yaml
-          kubectl create ns ${{ env.TEST_NAMESPACE }}
+          kubectl create ns "$TEST_NAMESPACE"
           echo "Waiting for conversion webhook to be ready..."
           for i in $(seq 1 60); do
             kubectl create --dry-run=server -f config/samples/rhtas_v1_securesign.yaml 2>/dev/null && break
             echo "Waiting for conversion webhook... ($i/60)"
             sleep 5
           done
-          kubectl create -f config/samples/rhtas_v1_securesign.yaml -n ${{ env.TEST_NAMESPACE }}
+          kubectl create -f config/samples/rhtas_v1_securesign.yaml -n "$TEST_NAMESPACE"
           sleep 1
           kubectl wait --for=condition=Ready securesign/securesign-sample \
-            --timeout=5m -n ${{ env.TEST_NAMESPACE }}
+            --timeout=5m -n "$TEST_NAMESPACE"
 
       - name: Run E2E tests
         working-directory: e2e
         env:
-          OIDC_ISSUER_URL: "http://${{ steps.kind.outputs.oidc_host }}/realms/trusted-artifact-signer"
+          OIDC_HOST: ${{ steps.kind.outputs.oidc_host }}
           CLI_STRATEGY: cgw
           CGW_URL: "https://developers.redhat.com/content-gateway/file/RHTAS/${{ env.CLI_CGW_VERSION }}"
           DOCKER_CONFIG: /tmp
         run: |
-          REKOR_UI_URL=$(kubectl get rekor -o jsonpath='{.items[0].status.rekorSearchUIUrl}' -n ${{ env.TEST_NAMESPACE }})
+          set -euo pipefail
+          export OIDC_ISSUER_URL="http://${OIDC_HOST}/realms/trusted-artifact-signer"
+          REKOR_UI_URL=$(kubectl get rekor -o jsonpath='{.items[0].status.rekorSearchUIUrl}' -n "$TEST_NAMESPACE")
           export REKOR_UI_URL
-          TUF_URL=$(kubectl get tuf -o jsonpath='{.items[0].status.url}' -n ${{ env.TEST_NAMESPACE }})
+          TUF_URL=$(kubectl get tuf -o jsonpath='{.items[0].status.url}' -n "$TEST_NAMESPACE")
           export TUF_URL
-          REKOR_URL=$(kubectl get rekor -o jsonpath='{.items[0].status.url}' -n ${{ env.TEST_NAMESPACE }})
+          REKOR_URL=$(kubectl get rekor -o jsonpath='{.items[0].status.url}' -n "$TEST_NAMESPACE")
           export REKOR_URL
-          FULCIO_URL=$(kubectl get fulcio -o jsonpath='{.items[0].status.url}' -n ${{ env.TEST_NAMESPACE }})
+          FULCIO_URL=$(kubectl get fulcio -o jsonpath='{.items[0].status.url}' -n "$TEST_NAMESPACE")
           export FULCIO_URL
 
           source ./tas-env-variables.sh
