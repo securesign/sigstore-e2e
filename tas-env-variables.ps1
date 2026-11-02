@@ -1,7 +1,18 @@
 # Get the URLs and export them as environment variables
 $TUF_URL = $(oc get tuf -o jsonpath='{.items[0].status.url}')
-$OIDC_ROUTE = $(oc get route -n keycloak-system -l app=keycloak -o jsonpath='{.items[0].spec.host}')
-$OIDC_ISSUER_URL = "https://$OIDC_ROUTE/realms/trusted-artifact-signer"
+if (-not $env:OIDC_ISSUER_URL) {
+    # Keycloak serves under /realms (RHBK) or /auth/realms (legacy RH-SSO), so this
+    # guess only holds for RHBK. Honour a pre-set OIDC_ISSUER_URL from the caller,
+    # matching the guard tas-env-variables.sh already has.
+    #
+    # Read the host from .status.ingress[0].host, as tas-env-variables.sh does.
+    # .spec.host is the requested hostname and is empty when the route lets
+    # OpenShift generate one; the status field always carries the admitted host.
+    $OIDC_ROUTE = $(oc get route -n keycloak-system -l app=keycloak -o jsonpath='{.items[0].status.ingress[0].host}')
+    $OIDC_ISSUER_URL = "https://$OIDC_ROUTE/realms/trusted-artifact-signer"
+} else {
+    $OIDC_ISSUER_URL = $env:OIDC_ISSUER_URL
+}
 $FULCIO_URL = $(oc get fulcio -o jsonpath='{.items[0].status.url}')
 $REKOR_URL = $(oc get rekor -o jsonpath='{.items[0].status.url}')
 $REKOR_UI_URL = $(oc get rekor -o jsonpath='{.items[0].status.rekorSearchUIUrl}')
