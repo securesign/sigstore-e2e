@@ -1,5 +1,13 @@
+# Values already set by the caller are honoured and are not overwritten by
+# values derived from `oc` below, matching tas-env-variables.sh.
+
 # Get the URLs and export them as environment variables
-$TUF_URL = $(oc get tuf -o jsonpath='{.items[0].status.url}')
+if (-not $env:TUF_URL) {
+    $TUF_URL = $(oc get tuf -o jsonpath='{.items[0].status.url}')
+} else {
+    $TUF_URL = $env:TUF_URL
+}
+
 if (-not $env:OIDC_ISSUER_URL) {
     # Keycloak serves under /realms (RHBK) or /auth/realms (legacy RH-SSO), so this
     # guess only holds for RHBK. Honour a pre-set OIDC_ISSUER_URL from the caller,
@@ -13,9 +21,24 @@ if (-not $env:OIDC_ISSUER_URL) {
 } else {
     $OIDC_ISSUER_URL = $env:OIDC_ISSUER_URL
 }
-$FULCIO_URL = $(oc get fulcio -o jsonpath='{.items[0].status.url}')
-$REKOR_URL = $(oc get rekor -o jsonpath='{.items[0].status.url}')
-$REKOR_UI_URL = $(oc get rekor -o jsonpath='{.items[0].status.rekorSearchUIUrl}')
+
+if (-not $env:FULCIO_URL) {
+    $FULCIO_URL = $(oc get fulcio -o jsonpath='{.items[0].status.url}')
+} else {
+    $FULCIO_URL = $env:FULCIO_URL
+}
+
+if (-not $env:REKOR_URL) {
+    $REKOR_URL = $(oc get rekor -o jsonpath='{.items[0].status.url}')
+} else {
+    $REKOR_URL = $env:REKOR_URL
+}
+
+if (-not $env:REKOR_UI_URL) {
+    $REKOR_UI_URL = $(oc get rekor -o jsonpath='{.items[0].status.rekorSearchUIUrl}')
+} else {
+    $REKOR_UI_URL = $env:REKOR_UI_URL
+}
 
 if (-not $env:OIDC_CLIENT_ID) {
     $OIDC_CLIENT_ID = "trusted-artifact-signer"
