@@ -20,7 +20,11 @@ env:
   OPERATOR_REPO: securesign/secure-sign-operator
   OPERATOR_REF: ${{ inputs.operator_ref || 'main' }}
   TEST_NAMESPACE: test
-  CLI_CGW_VERSION: "1.4.2"
+  # The operator and its service images are built from secure-sign-operator main
+  # (OPERATOR_REF), i.e. an unreleased build. The CLI binaries, however, come from
+  # the content gateway, which only ever hosts published GA releases — so they are
+  # pinned to the newest GA, not to the operator under test. Bump on each GA.
+  CLI_CGW_VERSION: "1.5.0"
 
 jobs:
   e2e:
