@@ -55,7 +55,7 @@ func TestStrategyCliServer(t *testing.T) {
 
 	fakeClient := newFakeClient(t, cliDownload).Build()
 
-	path, err := download(t.Context(), fakeClient, "testcli")
+	path, err := download(t.Context(), fakeClient, "testcli", "1.4.1")
 	if err != nil {
 		t.Fatalf("download failed: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestStrategyContentGateway(t *testing.T) {
 
 	fakeClient := newFakeClient(t, cliDownload).Build()
 
-	path, err := download(t.Context(), fakeClient, "testcli")
+	path, err := download(t.Context(), fakeClient, "testcli", "1.4.1")
 	if err != nil {
 		t.Fatalf("download failed: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestStrategyContentGatewayZip(t *testing.T) {
 	// a .zip rather than a .tar.gz. Previously this fell through to
 	// strategy.DownloadFromLink, which neither understands .zip nor retries
 	// against the CDN fallback on failure.
-	path, err := download(t.Context(), fakeClient, "testcli")
+	path, err := download(t.Context(), fakeClient, "testcli", "1.4.1")
 	if err != nil {
 		t.Fatalf("download failed: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestStrategyContentGatewayNameOverride(t *testing.T) {
 
 	fakeClient := newFakeClient(t, cliDownload).Build()
 
-	path, err := download(t.Context(), fakeClient, "gitsign")
+	path, err := download(t.Context(), fakeClient, "gitsign", "1.4.1")
 	if err != nil {
 		t.Fatalf("download failed: %v", err)
 	}
@@ -172,7 +172,7 @@ func TestStrategyContentGatewayNameOverride(t *testing.T) {
 func TestStrategyErrorNotFound(t *testing.T) {
 	fakeClient := newFakeClient(t).Build()
 
-	_, err := download(t.Context(), fakeClient, "nonexistent")
+	_, err := download(t.Context(), fakeClient, "nonexistent", "1.4.1")
 	if err == nil {
 		t.Fatal("expected error for nonexistent CLI download")
 	}
@@ -192,7 +192,7 @@ func TestStrategyErrorNoMatchingLink(t *testing.T) {
 
 	fakeClient := newFakeClient(t, cliDownload).Build()
 
-	_, err := download(t.Context(), fakeClient, "testcli")
+	_, err := download(t.Context(), fakeClient, "testcli", "1.4.1")
 	if err == nil {
 		t.Fatal("expected error when no link matches the current OS/arch")
 	}

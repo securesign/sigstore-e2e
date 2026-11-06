@@ -150,6 +150,45 @@ func Download(ctx context.Context, link string, writer io.Writer) (int64, error)
 	return 0, fmt.Errorf("download failed after %d attempts: %w", maxRetries, lastErr)
 }
 
+// contentGatewayPath is the path prefix Red Hat's content gateway serves file
+// downloads under.
+const contentGatewayPath = "/content-gateway/"
+
+// IsContentGatewayLink reports whether link addresses the Red Hat content
+// gateway. Such a link never serves the archive itself: it redirects to an HTML
+// interstitial page that carries the real location in a tcDownloadURL query
+// parameter, so it must be passed through ResolveCDNLink before downloading.
+func IsContentGatewayLink(link string) bool {
+	u, err := url.Parse(link)
+	if err != nil {
+		return strings.Contains(link, contentGatewayPath)
+	}
+	return strings.Contains(u.Path, contentGatewayPath)
+}
+
+// ContentGatewayLinkForVersion rewrites link's RHTAS version segment to
+// version and returns the result. ConsoleCLIDownload resources can be
+// generated from an unreleased operator build, while the corresponding CLI
+// archive is only published for a released version, so the caller must pin
+// the exact version to download. The requested version is applied exactly;
+// if link cannot be parsed, or has no RHTAS version segment to rewrite, the
+// call fails rather than silently returning the original, unpinned link.
+func ContentGatewayLinkForVersion(link string, version string) (string, error) {
+	u, err := url.Parse(link)
+	if err != nil {
+		return "", err
+	}
+	parts := strings.Split(u.Path, "/")
+	for i := 0; i+1 < len(parts); i++ {
+		if parts[i] == "RHTAS" {
+			parts[i+1] = version
+			u.Path = strings.Join(parts, "/")
+			return u.String(), nil
+		}
+	}
+	return "", fmt.Errorf("content gateway link %q has no RHTAS version segment to pin to %s", link, version)
+}
+
 func ResolveCDNLink(ctx context.Context, link string) (string, error) {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
