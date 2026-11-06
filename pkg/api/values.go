@@ -20,6 +20,8 @@ const (
 	CliStrategy      = "CLI_STRATEGY"
 	CLIServerURL     = "CLI_SERVER_URL"
 	CGWURL           = "CGW_URL"
+	CLICGWVersion    = "CLI_CGW_VERSION"
+	CLILocalDir      = "CLI_LOCAL_DIR"
 	ManualImageSetup = "MANUAL_IMAGE_SETUP"
 	TargetImageName  = "TARGET_IMAGE_NAME"
 	CosignImage      = "COSIGN_IMAGE"
@@ -64,6 +66,13 @@ func init() {
 	Values.SetDefault(TestSafari, "true")
 	Values.SetDefault(TestEdge, "true")
 	Values.SetDefault(RegistryImage, "registry:2.8.3")
+	// Default to the latest published RHTAS GA; bump this when a new z-stream
+	// ships. CLI_STRATEGY=openshift always uses whatever CLI_CGW_VERSION
+	// resolves to, so this is the single place callers (secure-sign-operator,
+	// pipelines) rely on instead of each pinning their own copy of the value.
+	// Testing an unpublished release candidate is covered separately by
+	// CLI_STRATEGY=local + CLI_LOCAL_DIR (see releases' cross-platform-tests).
+	Values.SetDefault(CLICGWVersion, "1.5.0")
 	Values.AutomaticEnv()
 }
 

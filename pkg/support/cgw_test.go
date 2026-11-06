@@ -66,3 +66,56 @@ func TestFindBinaryDirectMatchNoSymlink(t *testing.T) {
 		t.Fatalf("expected direct match %q, got %q", actual, path)
 	}
 }
+
+func TestContentGatewayLinkForVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		link    string
+		version string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:    "rewrites plain RHTAS link",
+			link:    "https://developers.redhat.com/content-gateway/file/RHTAS/1.5.1/cosign_linux_amd64.tar.gz",
+			version: "1.5.0",
+			want:    "https://developers.redhat.com/content-gateway/file/RHTAS/1.5.0/cosign_linux_amd64.tar.gz",
+		},
+		{
+			name:    "rewrites cgw/RHTAS link",
+			link:    "https://developers.redhat.com/content-gateway/file/cgw/RHTAS/1.4.0/cosign_linux_amd64.tar.gz",
+			version: "1.5.0",
+			want:    "https://developers.redhat.com/content-gateway/file/cgw/RHTAS/1.5.0/cosign_linux_amd64.tar.gz",
+		},
+		{
+			name:    "errors when link has no RHTAS segment",
+			link:    "https://developers.redhat.com/content-gateway/file/cosign_linux_amd64.tar.gz",
+			version: "1.5.0",
+			wantErr: true,
+		},
+		{
+			name:    "errors on unparseable URL",
+			link:    "://not a url",
+			version: "1.5.0",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ContentGatewayLinkForVersion(tt.link, tt.version)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got link %q", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Fatalf("expected %q, got %q", tt.want, got)
+			}
+		})
+	}
+}
