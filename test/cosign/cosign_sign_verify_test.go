@@ -20,7 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var logIndex int
+var logIndex int64
 var hashValue string
 var rekorEntryType string
 var dsseEnvelopePath string
@@ -93,16 +93,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 			// pick the one with the highest logIndex (most recent).
 			// Retry the download — the registry may not have propagated the
 			// signature immediately after signing.
-			type sigBundle struct {
-				VerificationMaterial struct {
-					TlogEntries []struct {
-						LogIndex json.RawMessage `json:"logIndex"`
-					} `json:"tlogEntries"`
-				} `json:"verificationMaterial"`
-				DSSEEnvelope json.RawMessage `json:"dsseEnvelope"`
-			}
-
-			var bestBundle sigBundle
+			var bestBundle *signatureBundle
 			var lastErr error
 			logIndex = -1
 			const (
@@ -121,41 +112,17 @@ var _ = Describe("Cosign test", Ordered, func() {
 					continue
 				}
 
-				startIdx := strings.Index(string(bundleOutput), "{")
-				if startIdx == -1 {
-					lastErr = fmt.Errorf("no JSON object in bundle output")
-					continue
-				}
-
-				decoder := json.NewDecoder(strings.NewReader(string(bundleOutput[startIdx:])))
-				for decoder.More() {
-					var b sigBundle
-					if err := decoder.Decode(&b); err != nil {
-						break
-					}
-					if len(b.VerificationMaterial.TlogEntries) == 0 {
-						continue
-					}
-					idx, err := strconv.Atoi(strings.Trim(string(b.VerificationMaterial.TlogEntries[0].LogIndex), "\""))
-					if err != nil {
-						continue
-					}
-					if idx > logIndex {
-						logIndex = idx
-						bestBundle = b
-					}
-				}
-
-				if logIndex >= 0 {
+				bestBundle, lastErr = latestSignatureBundle(bundleOutput)
+				if lastErr == nil {
+					logIndex = bestBundle.GetVerificationMaterial().GetTlogEntries()[0].GetLogIndex()
 					break
 				}
-				lastErr = fmt.Errorf("no bundle with valid tlog entry")
 			}
 			Expect(logIndex).To(BeNumerically(">=", 0), fmt.Sprintf("no valid signature bundle found after %d attempts: %v", maxRetries, lastErr))
 
-			if len(bestBundle.DSSEEnvelope) > 0 {
+			if bestBundle.GetDsseEnvelope() != nil {
 				dsseEnvelopePath = filepath.Join(tempDir, "dsse-envelope.json")
-				Expect(os.WriteFile(dsseEnvelopePath, bestBundle.DSSEEnvelope, 0600)).To(Succeed())
+				Expect(os.WriteFile(dsseEnvelopePath, bestBundle.rawDSSEEnvelope, 0600)).To(Succeed())
 			}
 		})
 	})
@@ -172,7 +139,7 @@ var _ = Describe("Cosign test", Ordered, func() {
 	Describe("rekor-cli get (via --log-index)", func() {
 		It("should retrieve the entry from Rekor and create public-key and signature files", func() {
 			rekorServerURL := api.GetValueFor(api.RekorURL)
-			logIndexStr := strconv.Itoa(logIndex)
+			logIndexStr := strconv.FormatInt(logIndex, 10)
 
 			output, err := rekorCli.CommandOutput(testsupport.TestContext, "get", "--rekor_server", rekorServerURL, "--log-index", logIndexStr)
 			Expect(err).ToNot(HaveOccurred())
