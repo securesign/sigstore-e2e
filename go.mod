@@ -14,6 +14,7 @@ require (
 	github.com/onsi/gomega v1.27.10
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/openshift/api v0.0.0-20230817133225-564be9ddb58e
+	github.com/sigstore/protobuf-specs v0.5.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.17.0
 	github.com/testcontainers/testcontainers-go/modules/registry v0.33.0
@@ -31,6 +32,7 @@ require (
 	github.com/moby/sys/userns v0.1.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.19.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.19.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240318140521-94a12d6c2237 // indirect
 	k8s.io/api v0.27.4 // indirect
 )
 
@@ -135,7 +137,7 @@ require (
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/protobuf v1.33.0 // indirect
+	google.golang.org/protobuf v1.36.6
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
