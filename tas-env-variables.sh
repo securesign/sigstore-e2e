@@ -1,26 +1,26 @@
 #!/bin/bash
 
-if [ -z "$OIDC_ISSUER_URL" ]; then
+if [ -z "${OIDC_ISSUER_URL:-}" ]; then
   export OIDC_ISSUER_URL=https://$(oc get route -n keycloak-system -l app=keycloak -o jsonpath='{.items[0].status.ingress[0].host}')/realms/trusted-artifact-signer
 fi
 
-if [ -z "$OIDC_CLIENT_ID" ]; then
-  OIDC_CLIENT_ID="trusted-artifact-signer"
+if [ -z "${OIDC_CLIENT_ID:-}" ]; then
+  export OIDC_CLIENT_ID="trusted-artifact-signer"
 fi
 
-if [ -z "$TUF_URL" ]; then
+if [ -z "${TUF_URL:-}" ]; then
   export TUF_URL=$(oc get tuf -o jsonpath='{.items[0].status.url}')
 fi
 
-if [ -z "$FULCIO_URL" ]; then
+if [ -z "${FULCIO_URL:-}" ]; then
   export FULCIO_URL=$(oc get fulcio -o jsonpath='{.items[0].status.url}')
 fi
 
-if [ -z "$REKOR_URL" ]; then
+if [ -z "${REKOR_URL:-}" ]; then
   export REKOR_URL=$(oc get rekor -o jsonpath='{.items[0].status.url}')
 fi
 
-if [ -z "$REKOR_UI_URL" ]; then
+if [ -z "${REKOR_UI_URL:-}" ]; then
   export REKOR_UI_URL=$(oc get rekor -o jsonpath='{.items[0].status.rekorSearchUIUrl}')
 fi
 
