@@ -1,10 +1,44 @@
+# Values already set by the caller are honoured and are not overwritten by
+# values derived from `oc` below, matching tas-env-variables.sh.
+
 # Get the URLs and export them as environment variables
-$TUF_URL = $(oc get tuf -o jsonpath='{.items[0].status.url}')
-$OIDC_ROUTE = $(oc get route -n keycloak-system -l app=keycloak -o jsonpath='{.items[0].spec.host}')
-$OIDC_ISSUER_URL = "https://$OIDC_ROUTE/realms/trusted-artifact-signer"
-$FULCIO_URL = $(oc get fulcio -o jsonpath='{.items[0].status.url}')
-$REKOR_URL = $(oc get rekor -o jsonpath='{.items[0].status.url}')
-$REKOR_UI_URL = $(oc get rekor -o jsonpath='{.items[0].status.rekorSearchUIUrl}')
+if (-not $env:TUF_URL) {
+    $TUF_URL = $(oc get tuf -o jsonpath='{.items[0].status.url}')
+} else {
+    $TUF_URL = $env:TUF_URL
+}
+
+if (-not $env:OIDC_ISSUER_URL) {
+    # Keycloak serves under /realms (RHBK) or /auth/realms (legacy RH-SSO), so this
+    # guess only holds for RHBK. Honour a pre-set OIDC_ISSUER_URL from the caller,
+    # matching the guard tas-env-variables.sh already has.
+    #
+    # Read the host from .status.ingress[0].host, as tas-env-variables.sh does.
+    # .spec.host is the requested hostname and is empty when the route lets
+    # OpenShift generate one; the status field always carries the admitted host.
+    $OIDC_ROUTE = $(oc get route -n keycloak-system -l app=keycloak -o jsonpath='{.items[0].status.ingress[0].host}')
+    $OIDC_ISSUER_URL = "https://$OIDC_ROUTE/realms/trusted-artifact-signer"
+} else {
+    $OIDC_ISSUER_URL = $env:OIDC_ISSUER_URL
+}
+
+if (-not $env:FULCIO_URL) {
+    $FULCIO_URL = $(oc get fulcio -o jsonpath='{.items[0].status.url}')
+} else {
+    $FULCIO_URL = $env:FULCIO_URL
+}
+
+if (-not $env:REKOR_URL) {
+    $REKOR_URL = $(oc get rekor -o jsonpath='{.items[0].status.url}')
+} else {
+    $REKOR_URL = $env:REKOR_URL
+}
+
+if (-not $env:REKOR_UI_URL) {
+    $REKOR_UI_URL = $(oc get rekor -o jsonpath='{.items[0].status.rekorSearchUIUrl}')
+} else {
+    $REKOR_UI_URL = $env:REKOR_UI_URL
+}
 
 if (-not $env:OIDC_CLIENT_ID) {
     $OIDC_CLIENT_ID = "trusted-artifact-signer"
