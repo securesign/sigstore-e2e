@@ -1,12 +1,19 @@
 @echo off
 
+REM Values already set by the caller are honoured and are not overwritten by
+REM values derived from `oc` below, matching tas-env-variables.sh.
+
 REM Get the URLs and export them as environment variables
-for /f "tokens=*" %%i in ('oc get tuf -o jsonpath^="{.items[0].status.url}"') do set TUF_URL=%%i
-for /f "tokens=*" %%i in ('oc get route -n keycloak-system -l app^=keycloak -o jsonpath^="{.items[0].spec.host}"') do set OIDC_ROUTE=%%i
+if "%TUF_URL%"=="" for /f "tokens=*" %%i in ('oc get tuf -o jsonpath^="{.items[0].status.url}"') do set TUF_URL=%%i
+
+if not "%OIDC_ISSUER_URL%"=="" goto :oidc_issuer_set
+for /f "tokens=*" %%i in ('oc get route -n keycloak-system -l app^=keycloak -o jsonpath^="{.items[0].status.ingress[0].host}"') do set OIDC_ROUTE=%%i
 set OIDC_ISSUER_URL=https://%OIDC_ROUTE%/realms/trusted-artifact-signer
-for /f "tokens=*" %%i in ('oc get fulcio -o jsonpath^="{.items[0].status.url}"') do set FULCIO_URL=%%i
-for /f "tokens=*" %%i in ('oc get rekor -o jsonpath^="{.items[0].status.url}"') do set REKOR_URL=%%i
-for /f "tokens=*" %%i in ('oc get rekor -o jsonpath^="{.items[0].status.rekorSearchUIUrl}"') do set REKOR_UI_URL=%%i
+:oidc_issuer_set
+
+if "%FULCIO_URL%"=="" for /f "tokens=*" %%i in ('oc get fulcio -o jsonpath^="{.items[0].status.url}"') do set FULCIO_URL=%%i
+if "%REKOR_URL%"=="" for /f "tokens=*" %%i in ('oc get rekor -o jsonpath^="{.items[0].status.url}"') do set REKOR_URL=%%i
+if "%REKOR_UI_URL%"=="" for /f "tokens=*" %%i in ('oc get rekor -o jsonpath^="{.items[0].status.rekorSearchUIUrl}"') do set REKOR_UI_URL=%%i
 
 if "%OIDC_CLIENT_ID%"=="" set OIDC_CLIENT_ID=trusted-artifact-signer
 
