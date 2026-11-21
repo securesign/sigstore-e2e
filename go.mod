@@ -1,6 +1,6 @@
 module github.com/securesign/sigstore-e2e
 
-go 1.22
+go 1.25
 
 replace github.com/go-jose/go-jose/v3 => github.com/go-jose/go-jose/v4 v4.0.5
 
@@ -80,7 +80,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
-	github.com/klauspost/compress v1.17.4 // indirect
+	github.com/klauspost/compress v1.20.2 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
